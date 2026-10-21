@@ -94,7 +94,7 @@ body.desktop .fire, body.desktop #aimBtn, body.desktop .stance { display: none; 
 .stance { position: absolute; right: max(18px, env(safe-area-inset-right, 0px)); bottom: calc(124px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 8px; pointer-events: auto; }
 @media (max-height: 430px) { .stance { bottom: calc(110px + env(safe-area-inset-bottom, 0px)); } .stance .act { width: 46px; height: 46px; } }
 .gear { pointer-events: auto; background: rgba(18,22,14,.72); border: 1px solid rgba(232,220,181,.3); color: var(--khaki); border-radius: 4px; width: 34px; height: 30px; font-size: 16px; cursor: pointer; padding: 0; }
-.steps { position: absolute; top: 50%; left: 50%; width: 0; height: 0; pointer-events: none; }
+.fsteps { position: absolute; top: 50%; left: 50%; width: 0; height: 0; pointer-events: none; }
 .step { position: absolute; width: 14px; height: 22px; border-radius: 50% 50% 45% 45%; background: rgba(255,255,255,.85); box-shadow: 0 0 6px rgba(0,0,0,.6); transition: opacity .6s; }
 .step::after { content: ""; position: absolute; left: 3px; top: -8px; width: 8px; height: 7px; border-radius: 50%; background: inherit; }
 .panel { width: min(420px, 100%); display: grid; gap: 14px; padding: 20px; border: 1px solid rgba(232,220,181,.25); border-radius: 6px; background: linear-gradient(180deg, rgba(47,58,36,.98), rgba(26,31,20,.99)); text-align: right; }
@@ -135,7 +135,7 @@ h2 { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 3
 .stat span { display: block; font-size: 11px; opacity: .7; } .stat strong { font-family: var(--font-display); font-weight: 800; font-size: 24px; color: var(--signal); font-variant-numeric: tabular-nums; }
 .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 .rotate { position: absolute; inset: 0; display: none; place-items: center; text-align: center; background: var(--ink); font-family: var(--font-display); font-size: 22px; padding: 24px; z-index: 50; }
-@media (orientation: portrait) and (pointer: coarse) { .rotate.ask { display: grid; } }
+@media (orientation: portrait) and (pointer: coarse) { body.playing .rotate.ask { display: grid; } }
 @media (prefers-reduced-motion: reduce) { .feed div { animation: none; } }
 @media (max-height: 430px) { #mini { width: 86px; height: 86px; } h1 { font-size: 36px; } .card { gap: 8px; padding: 14px; } .fire { width: 80px; height: 80px; } .steps { font-size: 12px; } }
 </style>
@@ -152,7 +152,7 @@ h2 { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 3
     <div class="dmg-dir" id="dmgDir" hidden></div>
     <div class="pin tl"><canvas id="mini" width="232" height="232" aria-label="الخريطة"></canvas></div>
     <div class="pin tc"><span class="chip">أحياء <b id="alive">0</b></span><span class="chip">قتلات <b id="kills">0</b></span><button class="gear" id="gearBtn" type="button" aria-label="الإعدادات">⚙</button></div>
-    <div class="steps" id="steps"></div>
+    <div class="fsteps" id="steps"></div>
     <div class="zone-msg" id="zoneMsg"></div>
     <div class="hint" id="hint" hidden></div>
     <div class="kill-banner" id="killBanner" hidden></div>

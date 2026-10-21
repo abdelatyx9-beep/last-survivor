@@ -1321,7 +1321,7 @@ function drawMini() {
 }
 
 // ---------------- HUD ----------------
-function showHud(on) { $("hud").hidden = !on; }
+function showHud(on) { $("hud").hidden = !on; document.body.classList.toggle("playing", !!on); }
 function updateHud() {
   if (!me) return;
   $("kills").textContent = ar(me.kills);
