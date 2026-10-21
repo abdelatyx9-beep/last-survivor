@@ -1,7 +1,9 @@
 // يخلي اللعبة تشتغل بدون إنترنت بعد أول فتح
 // لما تعدّل اللعبة، غيّر رقم النسخة هنا عشان الجوالات تاخذ التحديث
-const VERSION = "ls-v1";
-const CORE = ["/", "/index.html", "/config.js", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/icons/apple-touch-icon.png", "/net-supabase.js"];
+const VERSION = "ls-v2";
+const BASE = self.registration.scope;               // يشتغل على Vercel و GitHub Pages
+const u = (p) => new URL(p, BASE).href;
+const CORE = ["", "index.html", "config.js", "net-supabase.js", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"].map(u);
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(CORE)));
@@ -17,7 +19,7 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(req.url);
   if (url.hostname.endsWith("supabase.co")) return; // الأونلاين دايماً من النت
   if (req.mode === "navigate") {
-    e.respondWith(fetch(req).then((r) => { const cp = r.clone(); caches.open(VERSION).then((c) => c.put("/index.html", cp)); return r; }).catch(() => caches.match("/index.html")));
+    e.respondWith(fetch(req).then((r) => { const cp = r.clone(); caches.open(VERSION).then((c) => c.put(u("index.html"), cp)); return r; }).catch(() => caches.match(u("index.html"))));
     return;
   }
   // باقي الملفات: من الكاش على طول، ونحدّثها من النت بالخلفية
