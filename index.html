@@ -90,7 +90,23 @@ body { margin: 0; background: var(--ink); color: var(--khaki); font-family: var(
 .fire { width: 92px; height: 92px; border-radius: 50%; border: 3px solid rgba(255,255,255,.75); background: radial-gradient(circle, rgba(229,83,61,.9), rgba(160,30,20,.85)); color: #fff; font-family: var(--font-display); font-weight: 800; font-size: 17px; cursor: pointer; touch-action: none; }
 .stick { position: absolute; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; border: 2px solid rgba(232,220,181,.35); background: rgba(18,22,14,.2); pointer-events: none; }
 .stick i { position: absolute; left: 35px; top: 35px; width: 50px; height: 50px; border-radius: 50%; background: rgba(232,220,181,.45); }
-body.desktop .fire, body.desktop #aimBtn { display: none; }
+body.desktop .fire, body.desktop #aimBtn, body.desktop .stance { display: none; }
+.stance { position: absolute; right: max(18px, env(safe-area-inset-right, 0px)); bottom: calc(124px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 8px; pointer-events: auto; }
+@media (max-height: 430px) { .stance { bottom: calc(110px + env(safe-area-inset-bottom, 0px)); } .stance .act { width: 46px; height: 46px; } }
+.gear { pointer-events: auto; background: rgba(18,22,14,.72); border: 1px solid rgba(232,220,181,.3); color: var(--khaki); border-radius: 4px; width: 34px; height: 30px; font-size: 16px; cursor: pointer; padding: 0; }
+.steps { position: absolute; top: 50%; left: 50%; width: 0; height: 0; pointer-events: none; }
+.step { position: absolute; width: 14px; height: 22px; border-radius: 50% 50% 45% 45%; background: rgba(255,255,255,.85); box-shadow: 0 0 6px rgba(0,0,0,.6); transition: opacity .6s; }
+.step::after { content: ""; position: absolute; left: 3px; top: -8px; width: 8px; height: 7px; border-radius: 50%; background: inherit; }
+.panel { width: min(420px, 100%); display: grid; gap: 14px; padding: 20px; border: 1px solid rgba(232,220,181,.25); border-radius: 6px; background: linear-gradient(180deg, rgba(47,58,36,.98), rgba(26,31,20,.99)); text-align: right; }
+.set-row { display: grid; gap: 6px; }
+.set-row label { display: flex; justify-content: space-between; font-size: 14px; }
+.set-row label b { color: var(--signal); font-variant-numeric: tabular-nums; }
+.set-row input[type=range] { width: 100%; accent-color: var(--signal); height: 28px; }
+.qual { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.qual button { font-family: var(--font-body); font-size: 13px; padding: 9px 4px; border-radius: 4px; border: 1px solid rgba(232,220,181,.35); background: rgba(18,22,14,.5); color: var(--khaki); cursor: pointer; }
+.qual button.on { background: var(--signal); color: var(--ink); border-color: var(--signal); font-weight: 700; }
+.check { display: flex; gap: 10px; align-items: center; font-size: 14px; }
+.check input { width: 22px; height: 22px; accent-color: var(--signal); }
 .act:focus-visible, .slot:focus-visible, .btn:focus-visible, .pickup:focus-visible, .jump:focus-visible, .fire:focus-visible, input:focus-visible { outline: 3px solid var(--signal); outline-offset: 2px; }
 .overlay { position: absolute; inset: 0; display: grid; justify-items: center; align-content: safe center; direction: rtl; overflow-y: auto; background: radial-gradient(ellipse at 50% 30%, rgba(61,74,46,.78), rgba(18,22,14,.96)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 18px; }
 .card { width: min(440px, 100%); display: grid; gap: 12px; padding: 22px 20px; border: 1px solid rgba(232,220,181,.25); border-radius: 6px; background: linear-gradient(180deg, rgba(47,58,36,.96), rgba(26,31,20,.98)); box-shadow: 0 24px 70px rgba(0,0,0,.5); text-align: center; }
@@ -135,7 +151,8 @@ h2 { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 3
     <div class="hitmark" id="hitmark"></div>
     <div class="dmg-dir" id="dmgDir" hidden></div>
     <div class="pin tl"><canvas id="mini" width="232" height="232" aria-label="الخريطة"></canvas></div>
-    <div class="pin tc"><span class="chip">أحياء <b id="alive">0</b></span><span class="chip">قتلات <b id="kills">0</b></span></div>
+    <div class="pin tc"><span class="chip">أحياء <b id="alive">0</b></span><span class="chip">قتلات <b id="kills">0</b></span><button class="gear" id="gearBtn" type="button" aria-label="الإعدادات">⚙</button></div>
+    <div class="steps" id="steps"></div>
     <div class="zone-msg" id="zoneMsg"></div>
     <div class="hint" id="hint" hidden></div>
     <div class="kill-banner" id="killBanner" hidden></div>
@@ -164,6 +181,11 @@ h2 { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 3
       </div>
       <button class="fire" id="fireBtn" type="button" aria-label="إطلاق النار">نار</button>
     </div>
+    <div class="stance">
+      <button class="act" id="hopBtn" type="button">قفز</button>
+      <button class="act" id="crouchBtn" type="button">جلوس</button>
+      <button class="act" id="proneBtn" type="button">انبطاح</button>
+    </div>
     <button class="jump" id="jumpBtn" type="button" hidden>اقفز</button>
     <div class="stick" id="stick" hidden><i></i></div>
   </div>
@@ -184,7 +206,8 @@ h2 { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 3
         <button class="btn" id="soloBtn" type="button">العب الحين ضد البوتات</button>
         <button class="btn alt" id="onlineBtn" type="button">العب أونلاين مع أصحابك</button>
       </div>
-      <p class="note" id="onlineNote">الجوال: اليسار للمشي، واليمين للالتفات، والزر الأحمر للنار. الكمبيوتر: WASD والماوس، وكليك يمين للتنشين.</p>
+      <button class="btn alt" id="menuGear" type="button" style="font-size:16px;padding:8px">⚙ الإعدادات</button>
+      <p class="note" id="onlineNote">الجوال: اليسار للمشي، واليمين للالتفات، والزر الأحمر للنار. الكمبيوتر: WASD والماوس، وكليك يمين للتنشين، Space قفز، C جلوس، Z انبطاح.</p>
     </div>
   </div>
 
@@ -218,6 +241,19 @@ h2 { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 3
         <div class="stat"><span>وقت البقاء</span><strong id="endTime">0:00</strong></div>
       </div>
       <div class="row"><button class="btn" id="againBtn" type="button">مباراة جديدة</button><button class="btn alt" id="toMenuBtn" type="button">القائمة</button></div>
+    </div>
+  </div>
+  <div class="overlay" id="settings" hidden style="z-index:40">
+    <div class="panel">
+      <h2>الإعدادات</h2>
+      <div class="set-row"><label for="sensLook">حساسية الالتفات <b id="sensLookV">١٠٠٪</b></label><input type="range" id="sensLook" min="30" max="250" step="5" value="100"></div>
+      <div class="set-row"><label for="sensAim">حساسية التنشين <b id="sensAimV">١٠٠٪</b></label><input type="range" id="sensAim" min="30" max="250" step="5" value="100"></div>
+      <div class="set-row"><label>جودة الرسومات</label>
+        <div class="qual"><button type="button" data-q="auto">تلقائي</button><button type="button" data-q="low">منخفضة</button><button type="button" data-q="medium">متوسطة</button><button type="button" data-q="high">عالية</button></div>
+        <p class="note">لو اللعبة تقطّع على جوالك، اختر «منخفضة».</p>
+      </div>
+      <label class="check"><input type="checkbox" id="soundOn"> الصوت</label>
+      <button class="btn" id="settingsDone" type="button">تم</button>
     </div>
   </div>
   <div class="rotate ask">لف الجوال بالعرض 📱↔️<br>عشان تلعب</div>
