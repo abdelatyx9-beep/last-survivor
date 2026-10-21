@@ -668,7 +668,13 @@ const loadModel = new Promise((resolve, reject) => {
     if (ev.total) $("loadPct").textContent = ar(Math.round(ev.loaded / ev.total * 100)) + "٪";
   }, reject);
 });
-loadModel.then(() => { $("loading").hidden = true; $("menuBtns").hidden = false; }).catch(() => { $("loadPct").textContent = "ما قدرنا نحمّل الجندي. تأكد من النت وحدّث الصفحة."; });
+loadModel.then(() => { $("loading").hidden = true; $("menuBtns").hidden = false; }).catch(() => { loadFailed(); });
+function loadFailed() {
+  const l = $("loading"); l.textContent = "ما قدرنا نحمّل الجندي. تأكد من النت واضغط «حاول مرة ثانية». ";
+  const b = document.createElement("button"); b.className = "btn"; b.type = "button"; b.textContent = "حاول مرة ثانية"; b.style.marginTop = "8px";
+  b.addEventListener("click", () => location.reload()); l.append(b);
+}
+setTimeout(() => { if (!soldierGltf) loadFailed(); }, 30000);
 
 const FACE = Math.PI; // model faces -Z; rotate so it looks along the entity's heading
 function makeGun() {

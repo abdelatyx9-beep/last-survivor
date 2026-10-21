@@ -8,7 +8,9 @@
   let client = null;
   window.claude = {
     use: async (name) => {
-      if (name !== "room" || !ready()) return null;
+      if (name !== "room") return null;
+      for (let i = 0; i < 60 && !window.supabase && navigator.onLine; i++) await new Promise((r) => setTimeout(r, 100));
+      if (!ready()) return null;
       if (!client) client = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { realtime: { params: { eventsPerSecond: 25 } } });
       const myId = Math.random().toString(36).slice(2, 12);
       return { join: (roomName) => joinRoom(client, roomName, myId) };
