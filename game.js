@@ -1436,8 +1436,14 @@ $("menuGear").addEventListener("click", openSettings);
 // ---------------- menus ----------------
 function show(id) { for (const o of ["menu", "lobby", "endScreen"]) $(o).hidden = o !== id; }
 $("nick").addEventListener("change", () => store.set("ls3.nick", $("nick").value.trim()));
+// go full screen and landscape once the player taps play (phones only allow this after a tap)
+async function goFullscreen() {
+  if (!IS_TOUCH) return;
+  try { if (!document.fullscreenElement && document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen({ navigationUI: "hide" }); } catch (e) {}
+  try { await screen.orientation?.lock?.("landscape"); } catch (e) {}
+}
 $("soloBtn").addEventListener("click", async () => {
-  audio(); store.set("ls3.nick", $("nick").value.trim()); await loadModel;
+  goFullscreen(); audio(); store.set("ls3.nick", $("nick").value.trim()); await loadModel;
   online = false; isHost = false; show(null); startMatch((Math.random() * 1e9) >>> 0, { bots: 49, t0: Date.now() + 3000 });
 });
 $("toMenuBtn").addEventListener("click", () => { if (online) leaveRoom(); toMenu(); });
@@ -1462,7 +1468,7 @@ let roomApi = null, room = null, myPeer = null, joinedAt = 0, clockOff = 0, host
 let netSeq = 0, evOut = [], shotsOut = [], tookOut = [], botDeaths = [], seenEv = {}, seenShot = {}, seenTook = {}, seenBD = {}, netAcc = 0, myState = "lobby";
 (async () => { try { roomApi = await window.claude?.use?.("room"); } catch (e) { roomApi = null; } if (!roomApi) $("onlineNote").textContent = navigator.onLine ? "الأونلاين مو متاح هنا للحين. الفردي شغال عادي." : "ما فيه إنترنت. تقدر تلعب فردي ضد البوتات."; })();
 $("onlineBtn").addEventListener("click", async () => {
-  audio(); store.set("ls3.nick", $("nick").value.trim());
+  goFullscreen(); audio(); store.set("ls3.nick", $("nick").value.trim());
   if (!roomApi) { $("onlineNote").textContent = "الأونلاين يحتاج إنترنت وتسجيل دخول."; return; }
   await loadModel; mode = "lobby"; show("lobby"); $("lobbyJoin").hidden = false; $("lobbyRoom").hidden = true; $("lobbyBack").hidden = false;
 });
