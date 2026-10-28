@@ -37,16 +37,20 @@ body { margin: 0; background: var(--ink); color: var(--khaki); font-family: var(
 .tl { top: calc(8px + env(safe-area-inset-top, 0px)); left: max(10px, env(safe-area-inset-left, 0px)); }
 .tr { top: calc(8px + env(safe-area-inset-top, 0px)); right: max(10px, env(safe-area-inset-right, 0px)); flex-direction: column; align-items: flex-end; }
 .tc { top: calc(8px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); }
-#mini { width: 110px; height: 110px; border: 1px solid rgba(232,220,181,.35); border-radius: 4px; }
+#mini { pointer-events: auto; cursor: pointer; width: 110px; height: 110px; border: 1px solid rgba(232,220,181,.35); border-radius: 4px; }
 .chip { background: rgba(18,22,14,.72); border: 1px solid rgba(232,220,181,.22); border-radius: 4px; padding: 3px 9px; font-size: 12px; display: flex; gap: 6px; align-items: baseline; white-space: nowrap; }
 .chip b { font-family: var(--font-display); font-size: 19px; color: var(--signal); font-variant-numeric: tabular-nums; line-height: 1; }
 .feed { display: grid; gap: 3px; justify-items: end; font-size: 11px; max-width: 40vw; }
 .feed div { background: rgba(18,22,14,.7); padding: 2px 8px; border-radius: 3px; animation: fadeout 6s forwards; }
 .feed .me { color: var(--signal); }
 @keyframes fadeout { 0%, 80% { opacity: 1 } 100% { opacity: 0 } }
-.zone-msg { position: absolute; top: calc(44px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); font-size: 12px; background: rgba(18,22,14,.75); border: 1px solid rgba(138,76,255,.6); padding: 3px 12px; border-radius: 4px; white-space: nowrap; max-width: 70vw; overflow: hidden; text-overflow: ellipsis; }
+.compassbox { position: absolute; top: calc(42px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); display: grid; justify-items: center; pointer-events: none; }
+#compass { width: min(360px, 46vw); height: 26px; background: linear-gradient(90deg, transparent, rgba(18,22,14,.55) 20%, rgba(18,22,14,.55) 80%, transparent); }
+#markDist { font-size: 11px; color: #f2c641; font-weight: 700; text-shadow: 0 1px 3px #000; }
+.mappanel { width: min(92vmin, 680px); justify-items: center; } #bigmapCv { width: min(78vmin, 640px); height: min(78vmin, 640px); border: 1px solid rgba(232,220,181,.4); border-radius: 4px; touch-action: none; }
+.zone-msg { position: absolute; top: calc(74px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); font-size: 12px; background: rgba(18,22,14,.75); border: 1px solid rgba(138,76,255,.6); padding: 3px 12px; border-radius: 4px; white-space: nowrap; max-width: 70vw; overflow: hidden; text-overflow: ellipsis; }
 .zone-msg.hot { color: #fff; background: rgba(120,60,220,.8); }
-.hint { position: absolute; top: calc(74px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); background: rgba(242,165,65,.95); color: var(--ink); font-weight: 700; font-size: 14px; padding: 7px 14px; border-radius: 6px; max-width: min(520px, 80vw); text-align: center; line-height: 1.6; box-shadow: 0 6px 24px rgba(0,0,0,.35); }
+.hint { position: absolute; top: calc(102px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); background: rgba(242,165,65,.95); color: var(--ink); font-weight: 700; font-size: 14px; padding: 7px 14px; border-radius: 6px; max-width: min(520px, 80vw); text-align: center; line-height: 1.6; box-shadow: 0 6px 24px rgba(0,0,0,.35); }
 .kill-banner { position: absolute; top: 30%; left: 50%; transform: translateX(-50%); font-family: var(--font-display); font-weight: 800; font-size: 26px; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,.7); white-space: nowrap; }
 .guide { position: absolute; top: 42%; left: 50%; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 4px; font-size: 13px; font-weight: 700; text-shadow: 0 1px 6px rgba(0,0,0,.8); }
 .guide i { width: 0; height: 0; border-left: 12px solid transparent; border-right: 12px solid transparent; border-bottom: 22px solid var(--signal); filter: drop-shadow(0 2px 4px rgba(0,0,0,.6)); }
@@ -80,6 +84,46 @@ body { margin: 0; background: var(--ink); color: var(--khaki); font-family: var(
 .hp > i { display: block; height: 100%; background: var(--khaki); width: 100%; }
 .hp.low > i { background: var(--alert); } .hp.heal > i { background: var(--medic); }
 .armor { font-size: 11px; opacity: .85; }
+.boost { width: 100%; height: 4px; margin-top: 3px; background: rgba(232,220,181,.12); border-radius: 2px; overflow: hidden; }
+.boost > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #f2c641, #f2a541); }
+.act.dim { opacity: .45; }
+.act span { font-size: 10px; }
+.qmenu { position: absolute; left: calc(max(14px, env(safe-area-inset-left, 0px)) + 62px); top: 30%; display: grid; gap: 6px; pointer-events: auto; background: rgba(18,22,14,.9); border: 1px solid rgba(232,220,181,.3); border-radius: 6px; padding: 8px; min-width: 150px; z-index: 6; }
+.qmenu button { display: flex; justify-content: space-between; gap: 12px; align-items: center; font-family: var(--font-body); font-size: 14px; color: var(--khaki); background: rgba(232,220,181,.08); border: 1px solid rgba(232,220,181,.2); border-radius: 4px; padding: 8px 10px; cursor: pointer; }
+.qmenu button.on { border-color: var(--signal); }
+.qmenu b { font-family: var(--font-display); color: var(--signal); }
+.qmenu p { margin: 0; font-size: 12px; }
+.slot.pan { min-width: 60px; }
+.knockmsg { position: absolute; top: 34%; left: 50%; transform: translateX(-50%); background: rgba(160,30,20,.85); color: #fff; font-weight: 700; padding: 6px 14px; border-radius: 6px; font-size: 14px; white-space: nowrap; }
+.spec { position: absolute; bottom: calc(110px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); display: grid; gap: 6px; justify-items: center; background: rgba(18,22,14,.8); border: 1px solid rgba(232,220,181,.3); border-radius: 6px; padding: 10px 14px; pointer-events: auto; }
+.spec b { font-family: var(--font-display); color: var(--signal); font-size: 16px; } .spec span { font-size: 12px; opacity: .85; }
+.spec .row { display: flex; gap: 8px; } .spec .btn { font-size: 14px; padding: 8px 12px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.chips button { font-family: var(--font-display); font-weight: 700; font-size: 14px; padding: 7px 12px; border-radius: 6px; border: 1px solid rgba(232,220,181,.3); background: rgba(18,22,14,.6); color: var(--khaki); cursor: pointer; }
+.chips button.on { border-color: var(--signal); color: var(--signal); background: rgb(58,44,22); }
+h3.sub { margin: 4px 0 0; font-size: 13px; opacity: .8; font-weight: 600; }
+.spinner { width: 42px; height: 42px; margin: 6px auto; border-radius: 50%; border: 4px solid rgba(232,220,181,.2); border-top-color: var(--signal); animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.slot.fmb { min-width: 46px; text-align: center; font-size: 12px; display: grid; place-items: center; } .slot.fmb b { font-size: 10px; opacity: .7; font-weight: 400; }
+.flashfx { position: absolute; inset: 0; background: #fff; pointer-events: none; opacity: 0; }
+.bagpanel { width: min(560px, 100%); }
+.bag-gear { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.bag-gear div { background: rgba(232,220,181,.07); border: 1px solid rgba(232,220,181,.2); border-radius: 4px; padding: 8px; display: grid; gap: 2px; text-align: center; }
+.bag-gear span { font-size: 12px; opacity: .8; } .bag-gear b { font-family: var(--font-display); color: var(--signal); }
+.cap { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; font-size: 12px; }
+.cap b { height: 6px; background: rgba(0,0,0,.4); border-radius: 3px; overflow: hidden; } .cap i { display: block; height: 100%; background: var(--signal); }
+.bag-guns { display: grid; gap: 8px; }
+.bag-gun { display: grid; grid-template-columns: 1fr auto auto; gap: 6px 10px; align-items: center; background: rgba(232,220,181,.06); border: 1px solid rgba(232,220,181,.18); border-radius: 4px; padding: 8px; }
+.bag-gun b { font-family: var(--font-display); font-size: 16px; } .bag-gun .fm { font-size: 11px; opacity: .8; }
+.bag-gun .chips { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; }
+.bag-gun .chips i { font-style: normal; font-size: 11px; padding: 2px 7px; border-radius: 10px; border: 1px dashed rgba(232,220,181,.3); opacity: .6; }
+.bag-gun .chips i.on { border: 1px solid var(--signal); color: var(--signal); opacity: 1; }
+.bag-gun.empty { opacity: .5; }
+.bag-list { display: grid; gap: 4px; max-height: 38vh; overflow-y: auto; }
+.bag-row { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: center; padding: 6px 8px; border-bottom: 1px solid rgba(232,220,181,.1); }
+.bag-row b { font-family: var(--font-display); color: var(--signal); }
+.bag-row button, .bag-gun button { font-family: var(--font-body); font-size: 12px; color: var(--khaki); background: transparent; border: 1px solid rgba(232,220,181,.35); border-radius: 4px; padding: 4px 10px; cursor: pointer; }
+.bag-row button[data-use] { border-color: var(--medic); color: var(--medic); }
 .pickup { pointer-events: auto; background: var(--signal); color: var(--ink); border: 0; border-radius: 5px; padding: 9px 16px; font-family: var(--font-display); font-weight: 700; font-size: 15px; cursor: pointer; }
 .jump { pointer-events: auto; position: absolute; bottom: calc(30px + env(safe-area-inset-bottom, 0px)); right: max(30px, env(safe-area-inset-right, 0px)); background: var(--signal); color: var(--ink); border: 0; border-radius: 50%; width: 96px; height: 96px; font-family: var(--font-display); font-weight: 800; font-size: 24px; cursor: pointer; box-shadow: 0 0 0 6px rgba(242,165,65,.3), 0 8px 30px rgba(0,0,0,.4); }
 .right { position: absolute; right: max(18px, env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); display: grid; grid-template-columns: auto auto; gap: 10px; align-items: end; pointer-events: auto; }
@@ -92,6 +136,8 @@ body { margin: 0; background: var(--ink); color: var(--khaki); font-family: var(
 .stick i { position: absolute; left: 35px; top: 35px; width: 50px; height: 50px; border-radius: 50%; background: rgba(232,220,181,.45); }
 body.desktop .fire, body.desktop #aimBtn, body.desktop .stance { display: none; }
 .stance { position: absolute; right: max(18px, env(safe-area-inset-right, 0px)); bottom: calc(150px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 8px; pointer-events: auto; }
+.lean { position: absolute; left: calc(max(14px, env(safe-area-inset-left, 0px)) + 62px); top: 42%; display: flex; gap: 10px; pointer-events: auto; direction: ltr; }
+.lean .act { font-size: 18px; }
 @media (max-height: 430px) { .stance { bottom: calc(138px + env(safe-area-inset-bottom, 0px)); } .stance .act { width: 46px; height: 46px; } }
 .gear { pointer-events: auto; background: rgba(18,22,14,.72); border: 1px solid rgba(232,220,181,.3); color: var(--khaki); border-radius: 4px; width: 34px; height: 30px; font-size: 16px; cursor: pointer; padding: 0; }
 .fsteps { position: absolute; top: 50%; left: 50%; width: 0; height: 0; pointer-events: none; }
@@ -265,17 +311,21 @@ body.arena .alivechip, body.arena .zone-msg, body.arena .left-acts, body.arena #
 
   <div class="hud" id="hud" hidden>
     <div class="scope" id="scope" hidden></div>
+    <div class="flashfx" id="flashFx" hidden></div>
     <div class="cross" id="cross"></div>
     <div class="hitmark" id="hitmark"></div>
     <div class="dmg-dir" id="dmgDir" hidden></div>
     <div class="pin tl"><canvas id="mini" width="232" height="232" aria-label="الخريطة"></canvas></div>
     <div class="pin tc"><div class="score" id="score"><b class="sa" id="scA">٠</b><span id="scT">٥:٠٠</span><b class="sb" id="scB">٠</b></div><span class="chip big alivechip">باقي <b id="alive">0</b></span><span class="chip big kchip">قتلات <b id="kills">0</b></span><button class="gear" id="gearBtn" type="button" aria-label="الإعدادات">⚙</button></div>
     <div class="fsteps" id="steps"></div>
+    <div class="compassbox"><canvas id="compass" width="360" height="26" aria-label="البوصلة"></canvas><span id="markDist" hidden></span></div>
     <div class="zone-msg" id="zoneMsg"></div>
     <div class="hint" id="hint" hidden></div>
     <div class="kill-banner" id="killBanner" hidden></div>
     <div class="streak" id="streak" hidden></div>
     <div class="dnums" id="dnums"></div>
+    <div class="knockmsg" id="knockMsg" hidden>أُسقطت! ازحف لمكان آمن، وزميلك يقدر يسعفك</div>
+    <div class="spec" id="spec" hidden><b id="specName">تتابع زميلك</b><span id="specBy"></span><div class="row"><button class="btn alt" id="specNext" type="button">الزميل اللي بعده</button><button class="btn alt" id="specLeave" type="button">اطلع</button></div></div>
     <div class="respawn" id="respawn" hidden><b>انقتلت</b><span id="respawnBy"></span><em>ترجع بعد <i id="respawnT">٤</i></em></div>
     <div class="guide" id="guide" hidden><i></i><span></span></div>
     <div class="countdown" id="countdown" hidden></div>
@@ -283,18 +333,24 @@ body.arena .alivechip, body.arena .zone-msg, body.arena .left-acts, body.arena #
     <div class="progress" id="progress" hidden><span></span><b><i></i></b></div>
 
     <div class="left-acts">
-      <button class="act" id="bandBtn" type="button">ضماد<b id="bandN">0</b></button>
-      <button class="act" id="medBtn" type="button">إسعاف<b id="medN">0</b></button>
+      <button class="act" id="healBtn" type="button">علاج<b id="healN">0</b></button>
+      <button class="act" id="thrBtn" type="button"><span id="thrName">رمي</span><b id="thrN">0</b></button>
+      <button class="act" id="bagBtn" type="button">الشنطة<b>🎒</b></button>
     </div>
+    <div class="qmenu" id="healMenu" hidden></div>
+    <div class="qmenu" id="thrMenu" hidden></div>
     <div class="bottom">
       <div class="speedo" id="speedo" hidden><b id="spd">0</b><span>كم/س</span><em><i id="vhp"></i></em></div>
       <button class="pickup" id="pickupBtn" type="button" hidden>التقط</button>
       <div class="slots">
         <button class="slot" id="slot0" type="button"><span class="wn">فاضي</span><span class="am">—</span></button>
         <button class="slot" id="slot1" type="button"><span class="wn">فاضي</span><span class="am">—</span></button>
+        <button class="slot fmb" id="fmBtn" type="button" hidden>أوتو<b>وضع</b></button>
+        <button class="slot pan" id="slot2" type="button" hidden><span class="wn">مقلاة</span><span class="am">ضرب</span></button>
       </div>
       <div class="hp" id="hpbar"><i id="hpfill"></i></div>
-      <span class="armor" id="armorChip">بدون درع</span>
+      <div class="boost" id="boostbar" hidden><i id="boostfill"></i></div>
+      <span class="armor" id="armorChip">بدون عتاد</span>
     </div>
     <div class="right">
       <div style="display:grid;gap:10px">
@@ -302,6 +358,10 @@ body.arena .alivechip, body.arena .zone-msg, body.arena .left-acts, body.arena #
         <button class="act" id="reloadBtn" type="button">تعبئة</button>
       </div>
       <button class="fire" id="fireBtn" type="button" aria-label="إطلاق النار">نار</button>
+    </div>
+    <div class="lean" id="leanBox">
+      <button class="act" id="leanL" type="button" aria-label="ميلان يسار">⟲<small style="font-size:9px">ميل</small></button>
+      <button class="act" id="leanR" type="button" aria-label="ميلان يمين">⟳<small style="font-size:9px">ميل</small></button>
     </div>
     <div class="stance">
       <button class="act" id="hopBtn" type="button">قفز</button>
@@ -311,6 +371,7 @@ body.arena .alivechip, body.arena .zone-msg, body.arena .left-acts, body.arena #
     <div class="ctx">
       <button class="ctxb" id="doorBtn" type="button" hidden>افتح الباب</button>
       <button class="ctxb car" id="carBtn" type="button" hidden>اركب</button>
+      <button class="ctxb" id="reviveBtn" type="button" hidden>أسعف</button>
     </div>
     <button class="hb" id="hbBtn" type="button">فرامل<br>يد</button>
     <button class="jump" id="jumpBtn" type="button" hidden>اقفز</button>
@@ -340,6 +401,10 @@ body.arena .alivechip, body.arena .zone-msg, body.arena .left-acts, body.arena #
     <section class="lpanel" id="tab-play">
       <h3>الجديد في التحديث</h3>
       <ul class="news">
+        <li><b>جندي جديد</b>: يمسك السلاح بيدينه، ينحني وينبطح ويميل، ويطيح بشكل طبيعي</li>
+        <li><b>عتاد كامل</b>: خوذة وشنطة ودرع، ملحقات وسكوبات، قنابل ودخان ومولوتوف، والمقلاة!</li>
+        <li><b>فرق</b>: ثنائي وفرقة ٤، تسقط زميلك وتسعفه، وسيرفرات تجمعك مع لاعبين</li>
+        <li><b>إمداد جوي</b> و<b>منطقة حمراء</b> وبوصلة وعلامات على الخريطة</li>
         <li><b>حرب الشوارع</b>: ٥ ضد ٥ في البلدة القديمة، بمنظور أول شخص</li>
         <li><b>مخزن الأسلحة</b>: رقّ سلاحك لين المستوى ٥ بالنجوم ★</li>
         <li><b>بيوت</b> بأدوار وأبواب وشبابيك تنط منها</li>
@@ -347,7 +412,8 @@ body.arena .alivechip, body.arena .zone-msg, body.arena .left-acts, body.arena #
       </ul>
     </section>
     <section class="lpanel" id="tab-outfit" hidden>
-      <h3>الملابس</h3><div class="swatches" id="outfitList"></div>
+      <h3>الطقم</h3><div class="swatches" id="suitList"></div>
+      <h3>لون الملابس</h3><div class="swatches" id="outfitList"></div>
       <h3>لون المظلة</h3><div class="swatches sm" id="chuteList"></div>
     </section>
     <section class="lpanel" id="tab-guns" hidden>
@@ -371,8 +437,9 @@ body.arena .alivechip, body.arena .zone-msg, body.arena .left-acts, body.arena #
       <div class="modes" role="radiogroup" aria-label="نوع اللعب">
         <button type="button" data-mode="arena" class="on" role="radio" aria-checked="true">حرب الشوارع<small>٥ ضد ٥</small></button>
         <button type="button" data-mode="solo" role="radio" aria-checked="false">معركة البقاء<small>٥٠ لاعب</small></button>
-        <button type="button" data-mode="online" role="radio" aria-checked="false">أونلاين<small>مع أصحابك</small></button>
+        <button type="button" data-mode="online" role="radio" aria-checked="false">أونلاين<small>سيرفرات وأصحاب</small></button>
       </div>
+      <div class="chips tsmenu" id="tsSolo" hidden><button type="button" data-ts="1">فردي</button><button type="button" data-ts="2">ثنائي مع بوت</button><button type="button" data-ts="4">فرقة مع بوتات</button></div>
       <p class="loading" id="loading">جاري تحميل الجندي… <b id="loadPct"></b></p>
       <div id="menuBtns" hidden>
         <button class="startbtn" id="startBtn" type="button">ابدأ</button>
@@ -387,14 +454,23 @@ body.arena .alivechip, body.arena .zone-msg, body.arena .left-acts, body.arena #
     <div class="card">
       <h2>الردهة</h2>
       <div id="lobbyJoin" class="btns">
-        <button class="btn" id="createBtn" type="button">سوّ غرفة جديدة</button>
+        <h3 class="sub">السيرفر</h3>
+        <div class="chips" id="regionList"></div>
+        <h3 class="sub">الفريق</h3>
+        <div class="chips" id="tsList"><button type="button" data-ts="1">فردي</button><button type="button" data-ts="2">ثنائي</button><button type="button" data-ts="4">فرقة ٤</button></div>
+        <button class="btn" id="searchBtn" type="button">ابحث عن مباراة</button>
+        <p class="note">نجمعك مع لاعبين في نفس السيرفر، وإذا ما كفوا نكمّل المباراة ببوتات.</p>
+        <h3 class="sub">أو العب مع أصحابك</h3>
+        <button class="btn alt" id="createBtn" type="button">سوّ غرفة جديدة</button>
         <div class="field"><label for="codeIn">أو اكتب كود غرفة صاحبك</label><input id="codeIn" maxlength="6" autocomplete="off" placeholder="مثل: K7Q2" style="direction:ltr;text-transform:uppercase;text-align:center;letter-spacing:.2em"></div>
         <button class="btn alt" id="joinBtn" type="button">ادخل الغرفة</button>
       </div>
+      <div id="mmBox" hidden><div class="spinner"></div><p class="lead" id="mmTitle">جاري البحث…</p><p class="note" id="mmInfo"></p><button class="btn alt" id="mmCancel" type="button">إلغاء</button></div>
       <div id="lobbyRoom" hidden>
         <p class="note">أرسل الكود لأصحابك، وخلهم يفتحون نفس الرابط ويكتبونه</p>
         <div class="code" id="codeOut">----</div>
         <div class="roster" id="roster"></div>
+        <div class="chips" id="tsMenu" hidden><button type="button" data-ts="1">فردي</button><button type="button" data-ts="2">ثنائي</button><button type="button" data-ts="4">فرقة ٤</button></div>
         <p class="note" id="lobbyStatus">بانتظار اللاعبين…</p>
         <div class="row"><button class="btn" id="startOnlineBtn" type="button" hidden>ابدأ المباراة</button><button class="btn alt" id="leaveBtn" type="button">اطلع</button></div>
       </div>
@@ -416,6 +492,8 @@ body.arena .alivechip, body.arena .zone-msg, body.arena .left-acts, body.arena #
       <div class="row"><button class="btn" id="againBtn" type="button">مباراة جديدة</button><button class="btn alt" id="toMenuBtn" type="button">القائمة</button></div>
     </div>
   </div>
+  <div class="overlay bag" id="bag" hidden style="z-index:35"></div>
+  <div class="overlay" id="bigmap" hidden style="z-index:36"><div class="panel mappanel"><canvas id="bigmapCv" width="640" height="640" aria-label="الخريطة الكبيرة"></canvas><p class="note">اضغط على الخريطة عشان تحط علامة، واضغط عليها مرة ثانية عشان تشيلها.</p><button class="btn" id="bigmapClose" type="button">رجوع</button></div></div>
   <div class="overlay" id="settings" hidden style="z-index:40">
     <div class="panel">
       <h2>الإعدادات</h2>
@@ -435,11 +513,11 @@ body.arena .alivechip, body.arena .zone-msg, body.arena .left-acts, body.arena #
   <div class="rotate ask">لف الجوال بالعرض 📱↔️<br>عشان تلعب</div>
 </div>
 
-<script>window.SOLDIER_URL = "models/Soldier.glb";</script>
+<script>window.SOLDIER_URL = "models/swat.glb"; window.CAMO_URL = "models/camo.glb";</script>
 <script src="config.js"></script>
-<script async src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script async src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js"></script>
 <script src="net-supabase.js"></script>
 <script type="module" src="game.js"></script>
-<script>if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));</script>
+<script>if ("serviceWorker" in navigator) { const had = !!navigator.serviceWorker.controller; let done = false; navigator.serviceWorker.addEventListener("controllerchange", () => { if (had && !done) { done = true; location.reload(); } }); window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").then((r) => r.update()).catch(() => {})); }</script>
 </body>
 </html>

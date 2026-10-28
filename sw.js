@@ -1,9 +1,9 @@
 // يخلي اللعبة تشتغل بدون إنترنت بعد أول فتح
 // لما تعدّل اللعبة، غيّر رقم النسخة هنا عشان الجوالات تاخذ التحديث
-const VERSION = "ls3d-v8";
+const VERSION = "ls3d-v13";
 const BASE = self.registration.scope;               // يشتغل على Vercel و GitHub Pages
 const u = (p) => new URL(p, BASE).href;
-const CORE = ["", "index.html", "game.js", "config.js", "net-supabase.js", "manifest.webmanifest", "vendor/three.module.min.js", "vendor/jsm/loaders/GLTFLoader.js", "vendor/jsm/utils/BufferGeometryUtils.js", "vendor/jsm/utils/SkeletonUtils.js", "models/Soldier.glb", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"].map(u);
+const CORE = ["", "index.html", "game.js", "config.js", "net-supabase.js", "manifest.webmanifest", "vendor/three.module.min.js", "vendor/jsm/loaders/GLTFLoader.js", "vendor/jsm/utils/BufferGeometryUtils.js", "vendor/jsm/utils/SkeletonUtils.js", "models/swat.glb", "models/camo.glb", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"].map(u);
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(CORE)));
@@ -22,7 +22,12 @@ self.addEventListener("fetch", (e) => {
     e.respondWith(fetch(req).then((r) => { const cp = r.clone(); caches.open(VERSION).then((c) => c.put(u("index.html"), cp)); return r; }).catch(() => caches.match(u("index.html"))));
     return;
   }
-  // باقي الملفات: من الكاش على طول، ونحدّثها من النت بالخلفية
+  // كود اللعبة: من النت أول (عشان التحديث يوصل علطول)، والكاش لما ما فيه نت
+  if (url.origin === location.origin && /\.(js|html|json|webmanifest)$/.test(url.pathname)) {
+    e.respondWith(fetch(req).then((r) => { if (r && r.ok) { const cp = r.clone(); caches.open(VERSION).then((c) => c.put(req, cp)); } return r; }).catch(() => caches.match(req)));
+    return;
+  }
+  // الصور والمجسمات: من الكاش على طول، ونحدّثها من النت بالخلفية
   e.respondWith(caches.match(req).then((hit) => {
     const net = fetch(req).then((r) => { if (r && (r.ok || r.type === "opaque")) { const cp = r.clone(); caches.open(VERSION).then((c) => c.put(req, cp)); } return r; }).catch(() => hit);
     return hit || net;
