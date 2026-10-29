@@ -105,6 +105,7 @@ h3.sub { margin: 4px 0 0; font-size: 13px; opacity: .8; font-weight: 600; }
 .spinner { width: 42px; height: 42px; margin: 6px auto; border-radius: 50%; border: 4px solid rgba(232,220,181,.2); border-top-color: var(--signal); animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .slot.fmb { min-width: 46px; text-align: center; font-size: 12px; display: grid; place-items: center; } .slot.fmb b { font-size: 10px; opacity: .7; font-weight: 400; }
+.fpsm { position: absolute; top: calc(4px + env(safe-area-inset-top, 0px)); right: calc(max(10px, env(safe-area-inset-right, 0px)) + 120px); font: 700 11px monospace; color: #9f9; background: rgba(0,0,0,.5); padding: 2px 6px; border-radius: 3px; }
 .flashfx { position: absolute; inset: 0; background: #fff; pointer-events: none; opacity: 0; }
 .bagpanel { width: min(560px, 100%); }
 .bag-gear { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -312,6 +313,7 @@ body.arena .alivechip, body.arena .zone-msg, body.arena .left-acts, body.arena #
   <div class="hud" id="hud" hidden>
     <div class="scope" id="scope" hidden></div>
     <div class="flashfx" id="flashFx" hidden></div>
+    <div class="fpsm" id="fpsMeter" hidden>-- FPS</div>
     <div class="cross" id="cross"></div>
     <div class="hitmark" id="hitmark"></div>
     <div class="dmg-dir" id="dmgDir" hidden></div>
@@ -507,6 +509,7 @@ body.arena .alivechip, body.arena .zone-msg, body.arena .left-acts, body.arena #
         <div class="qual" style="grid-template-columns:repeat(3,1fr)"><button type="button" data-v="auto">تلقائي</button><button type="button" data-v="fps">أول شخص</button><button type="button" data-v="tps">ثالث شخص</button></div>
       </div>
       <label class="check"><input type="checkbox" id="soundOn"> الصوت</label>
+      <label class="check"><input type="checkbox" id="fpsOn"> اعرض سرعة اللعبة (الفريمات)</label>
       <button class="btn" id="settingsDone" type="button">تم</button>
     </div>
   </div>
