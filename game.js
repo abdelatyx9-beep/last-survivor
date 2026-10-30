@@ -542,11 +542,12 @@ window.addEventListener("resize", resize);
 const QUALITY = {
   low:    { pr: 0.75, shadows: false, map: 512,  fog: 220, draw: 160, loot: 35, rigDist: 35, lodDist: 7,  shChar: 0,  charDraw: 110 },
   medium: { pr: 1.0,  shadows: true,  map: 1024, fog: 320, draw: 230, loot: 45, rigDist: 60, lodDist: 13, shChar: 14, charDraw: 170 },
+  phone:  { pr: 1.0,  shadows: false, map: 512,  fog: 240, draw: 190, loot: 40, rigDist: 45, lodDist: 9,  shChar: 0,  charDraw: 130 },
   high:   { pr: 2.0,  shadows: true,  map: 2048, fog: 420, draw: 320, loot: 60, rigDist: 120, lodDist: 30, shChar: 35, charDraw: 260 }
 };
 let Q = QUALITY.medium;
 function applyQuality() {
-  const k = SETTINGS.quality === "auto" ? (IS_TOUCH ? "medium" : "high") : SETTINGS.quality;
+  const k = SETTINGS.quality === "auto" ? (IS_TOUCH ? "phone" : "high") : SETTINGS.quality;
   Q = QUALITY[k];
   pixelRatio = Math.min(Q.pr, Math.max(1, window.devicePixelRatio || 1)); if (k === "low") pixelRatio = 0.75;
   renderer.setPixelRatio(pixelRatio);
@@ -563,7 +564,8 @@ function canvasTex(w, h, draw, repeat) {
   return t;
 }
 const grassTex = canvasTex(512, 512, (g, w, h) => {
-  g.fillStyle = "#5f7d3b"; g.fillRect(0, 0, w, h);
+  g.fillStyle = "#677a43"; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 26; i++) { const x = Math.random() * w, y = Math.random() * h, r = 30 + Math.random() * 70; const gr = g.createRadialGradient(x, y, 0, x, y, r); const c = Math.random() < 0.5 ? "130,128,70" : "70,96,48"; gr.addColorStop(0, `rgba(${c},0.35)`); gr.addColorStop(1, `rgba(${c},0)`); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); }
   for (let i = 0; i < 9000; i++) { const x = Math.random() * w, y = Math.random() * h; g.fillStyle = `hsla(${78 + Math.random() * 30},${30 + Math.random() * 25}%,${22 + Math.random() * 22}%,0.55)`; g.fillRect(x, y, 1 + Math.random() * 2, 2 + Math.random() * 4); }
   for (let i = 0; i < 40; i++) { const x = Math.random() * w, y = Math.random() * h, r = 12 + Math.random() * 40; g.fillStyle = "rgba(120,104,70,0.18)"; g.beginPath(); g.ellipse(x, y, r, r * 0.6, Math.random() * 3, 0, TAU); g.fill(); }
 }, 70);
@@ -3948,6 +3950,11 @@ let ctxAcc = 0, ctxDoor = null, ctxVeh = null;
 // show the right action buttons for what is around you
 function ctxTick(dt) {
   ctxAcc -= dt; if (ctxAcc > 0) return; ctxAcc = 0.12;
+  const ix = me.inX || 0, iy = me.inY || 0, il = Math.hypot(ix, iy);
+  if (me.alive && me.ph === "ground" && !me.veh && il > 0.3) {
+    const d = doorNear(me, 1.6);
+    if (d && !d.open) { const dx = d.x + d.w / 2 - me.x, dy = d.y + d.h / 2 - me.y, l = Math.hypot(dx, dy) || 1; if ((dx * ix + dy * iy) / l / il > 0.25) { setDoor(d, true); ctxAcc = 0; } }
+  }
   const ok = me.alive && me.ph === "ground";
   ctxVeh = ok && !me.veh && !me.climb ? nearVehicle(me) : null;
   ctxDoor = ok && !me.veh && !me.climb && !ctxVeh ? doorNear(me) : null;
@@ -3990,8 +3997,12 @@ function update(dt) {
       let vx = fwdX * -mv.y + rX * mv.x, vy = fwdY * -mv.y + rY * mv.x; const l = Math.hypot(vx, vy);
       if (l > 1) { vx /= l; vy /= l; }
       const k = 1 - Math.exp(-dt * 14); // ease in/out so movement feels smooth
-      me.vx = lerp(me.vx, vx, k); me.vy = lerp(me.vy, vy, k);
-      if (me.ph === "ground") { if (input.firing() || aimZoom || l > 0.1) me.a = camYaw; }
+      me.vx = lerp(me.vx, vx, k); me.vy = lerp(me.vy, vy, k); me.inX = vx; me.inY = vy;
+      if (me.ph === "ground") {
+        const combatFace = input.firing() || aimZoom || me.shotT > 1.3 || fpsActive() || me.veh || me.stance === "prone";
+        if (combatFace) me.a = camYaw;
+        else if (l > 0.1) { const ta = Math.atan2(vy, vx); let da = ta - me.a; da = Math.atan2(Math.sin(da), Math.cos(da)); me.a += da * Math.min(1, dt * 12); }
+      }
       else if (me.ph === "para") me.a = camYaw;
       { const f = input.firing(), single = me.fm[me.cur] === "single"; if (f && (!single || !me.trigWas)) playerFire(); me.trigWas = f; }
       me.leanT = me.ph === "ground" && !me.veh && me.stance !== "prone" && !me.climb ? input.lean() : 0;
@@ -4160,7 +4171,9 @@ function render(dt) {
       setAnim(v, pick);
       // play the legs at the speed the body really moves
       const nominal = { walk: 2.4, run: 4.6, sprint: 5.6, walkup: 1.6, strafe: 2.2 }[v.cur];
-      if (nominal && v.acts[v.cur]) v.acts[v.cur].timeScale = st === "prone" ? 0.5 : clamp(spd / nominal, 0.55, 1.7);
+      let mva = Math.atan2(v.vy, v.vx) - e.a; mva = Math.atan2(Math.sin(mva), Math.cos(mva));
+      const back = spd > 0.4 && Math.abs(mva) > 2.0;
+      if (nominal && v.acts[v.cur]) v.acts[v.cur].timeScale = (st === "prone" ? 0.5 : clamp(spd / nominal, 0.55, 1.7)) * (back ? -1 : 1);
       if (v.cur === "kneel" && e.w[e.cur] >= 0) { const kw = e.w[e.cur], tot = WEAP[kw].reload * (e === me ? relK(me, kw) : 1), p = clamp(1 - e.reloadT / tot, 0, 1); v.acts.kneel.time = 0.35 + p * 4.3; v.acts.kneel.timeScale = 0; }
     }
     const wi = e.w[e.cur], wcls = wi >= 0 && (!e.veh || e.veh.driver !== e) ? WCLASS[wi] : "none";
@@ -4188,7 +4201,7 @@ function render(dt) {
         rigUpdate(v.rig, {
           yawRate: v.yawRate, speed: spd, mocapReload: v.cur === "kneel", lookAt: look ? [look.x, (look.z || 0) + 1.5, look.y] : null, ground: (x, y) => groundAt(x, y, (e.z || 0) + 0.7), baseZ: e.z || 0,
           ph: e.ph === "para" ? (e.z >= 32 ? "air" : "para") : e.ph, freefall: e.ph === "para" && e.z >= 32, stance: st, moving: e.moving && spd > 0.4, sprint: e.moving && spd > 4.2 && !(e.shotT > 0.6),
-          moveAng: -ma, aimPitch: e === me ? camPitch : e.aimP || 0, aiming: (e === me && aimZoom) || (e.kind === "bot" && !!e.seen), firedAt: e.shotT > 0 ? now - (2 - e.shotT) : -9, hitAt: e.hitAt || 0,
+          moveAng: -ma, aimPitch: e === me ? (aimZoom || me.shotT > 1.0 || !me.moving ? camPitch : 0.08) : e.aimP || 0, aiming: (e === me && aimZoom) || (e.kind === "bot" && !!e.seen), firedAt: e.shotT > 0 ? now - (2 - e.shotT) : -9, hitAt: e.hitAt || 0,
           reloadP: e.reloadT > 0 && wi >= 0 ? clamp(1 - e.reloadT / (WEAP[wi].reload * (e === me ? relK(me, wi) : 1)), 0, 1) : -1, wclass: wcls, lean: e.lean || 0,
           alive: e.alive, deadT: e.deadT || 0, deadDir: e.deadDir || 1, veh: !!e.veh, driver: !!(e.veh && e.veh.driver === e), airborne: e.onGround === false, now
         }, rdt, v.heldGun);
