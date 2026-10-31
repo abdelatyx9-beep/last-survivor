@@ -582,13 +582,13 @@ let pixelRatio = Math.min(window.devicePixelRatio || 1, IS_TOUCH ? 1.5 : 2);
 renderer.setPixelRatio(pixelRatio);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = 1.15;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
-const SKY = new THREE.Color(0xa9c7d8);
+const SKY = new THREE.Color(0xc4d6d6); // hazy daylight horizon (tuned so it stays blue-grey after tone mapping)
 scene.background = SKY;
-scene.fog = new THREE.Fog(SKY, 90, 420);
+scene.fog = new THREE.Fog(SKY, 110, 480);
 const camera = new THREE.PerspectiveCamera(62, 1, 0.06, 2600);
 const hemi = new THREE.HemisphereLight(0xdfeefa, 0x5b5a3c, 0.85); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff1d6, 2.2);
@@ -605,7 +605,7 @@ window.addEventListener("resize", resize);
 const QUALITY = {
   low:    { pr: 0.75, shadows: false, map: 512,  fog: 220, draw: 160, loot: 35, rigDist: 35, lodDist: 7,  shChar: 0,  charDraw: 110, grass: 900,  grassR: 14 },
   medium: { pr: 1.0,  shadows: true,  map: 1024, fog: 320, draw: 230, loot: 45, rigDist: 60, lodDist: 13, shChar: 14, charDraw: 170, grass: 3500, grassR: 26 },
-  phone:  { pr: 1.0,  shadows: false, map: 512,  fog: 240, draw: 190, loot: 40, rigDist: 45, lodDist: 9,  shChar: 0,  charDraw: 130, grass: 1800, grassR: 18 },
+  phone:  { pr: 1.0,  shadows: true,  map: 1024, fog: 260, draw: 190, loot: 40, rigDist: 45, lodDist: 9,  shChar: 10, charDraw: 130, grass: 1800, grassR: 18 },
   high:   { pr: 2.0,  shadows: true,  map: 2048, fog: 420, draw: 320, loot: 60, rigDist: 120, lodDist: 30, shChar: 35, charDraw: 260, grass: 7000, grassR: 38 }
 };
 let Q = QUALITY.medium;
@@ -711,6 +711,31 @@ function gableRoof(b, overhang, height) {
   return g;
 }
 
+// realistic daylight sky: deep blue overhead, hazy bright horizon, glow around the sun
+const SUN_DIR = new THREE.Vector3(40, 80, 25).normalize();
+function skyMaterial() {
+  return new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: { top: { value: new THREE.Color(0x2f6fbf) }, mid: { value: new THREE.Color(0x86b3d6) }, bot: { value: new THREE.Color(0xc4d6d6) }, ground: { value: new THREE.Color(0x8a8f7a) }, sunDir: { value: SUN_DIR }, sunCol: { value: new THREE.Color(0xfff2d8) } },
+    vertexShader: "varying vec3 vd; void main(){ vd = normalize(position); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }",
+    fragmentShader: `uniform vec3 top; uniform vec3 mid; uniform vec3 bot; uniform vec3 ground; uniform vec3 sunDir; uniform vec3 sunCol; varying vec3 vd;
+      void main(){ float h = vd.y; vec3 c = h < 0. ? mix(bot, ground, clamp(-h * 6., 0., 1.)) : mix(bot, mix(mid, top, clamp((h - 0.15) * 1.6, 0., 1.)), clamp(h * 5., 0., 1.));
+        float s = max(dot(vd, sunDir), 0.); c += sunCol * (pow(s, 900.) * 6. + pow(s, 30.) * 0.22 + pow(s, 4.) * 0.08);
+        gl_FragColor = vec4(c, 1.);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }` });
+}
+// image-based lighting: every material picks up soft light and reflections from the sky (made once)
+let envTex = null;
+function makeEnvironment() {
+  if (envTex) { scene.environment = envTex; return; }
+  try {
+    const pm = new THREE.PMREMGenerator(renderer), es = new THREE.Scene();
+    const m = skyMaterial(); m.uniforms.sunCol.value = new THREE.Color(0xfff2d8).multiplyScalar(0.6);
+    es.add(new THREE.Mesh(new THREE.SphereGeometry(10, 32, 16), m));
+    envTex = pm.fromScene(es, 0.04).texture; pm.dispose(); scene.environment = envTex;
+  } catch (e) { console.warn("env", e); }
+}
 let world = null, doorIm = null;
 const chunks = [];
 const roofMeshes = [];
@@ -729,14 +754,12 @@ function buildWorld() {
   if (world) { scene.remove(world); world.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); }
   world = new THREE.Group(); scene.add(world); roofMeshes.length = 0;
   // sky dome
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(1200, 24, 12), new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms: { top: { value: new THREE.Color(0x4f86b8) }, bot: { value: new THREE.Color(0xc9dbe3) } },
-    vertexShader: "varying float h; void main(){ h = normalize(position).y; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }",
-    fragmentShader: "uniform vec3 top; uniform vec3 bot; varying float h; void main(){ gl_FragColor = vec4(mix(bot, top, clamp(h*1.6,0.,1.)),1.); }" }));
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(1200, 32, 16), skyMaterial());
   sky.position.set(S / 2, 0, S / 2); world.add(sky);
+  makeEnvironment();
   const arena = MAP.kind === "arena";
   if (arena) buildArenaWorld();
-  sun.intensity = arena ? 2.9 : 2.1; sun.color.set(arena ? 0xffe8c4 : 0xfff1d6); hemi.intensity = arena ? 1.3 : 1.35; hemi.color.set(arena ? 0xfff0dc : 0xdfeefa); scene.fog.near = arena ? 70 : 90;
+  sun.intensity = arena ? 3.0 : 2.7; sun.color.set(arena ? 0xffe8c4 : 0xfff0d8); hemi.intensity = arena ? 0.55 : 0.5; hemi.color.set(arena ? 0xfff0dc : 0xdfeefa); scene.fog.near = arena ? 70 : 90;
   if (!arena) {
   const water = new THREE.Mesh(new THREE.PlaneGeometry(S * 5, S * 5), new THREE.MeshStandardMaterial({ color: 0x2f6f8a, roughness: 0.2, metalness: 0.2 }));
   water.rotation.x = -Math.PI / 2; water.position.set(S / 2, -0.3, S / 2); world.add(water);
@@ -867,12 +890,12 @@ function buildWorld() {
   rocks.forEach((o, i) => { q.setFromEuler(new THREE.Euler(o.rot * 0.3, o.rot, o.rot * 0.5)); m4.compose(v.set(o.x, o.r * 0.3, o.y), q, sv.set(o.r, o.r * 0.75, o.r * 1.1)); rockIm.setMatrixAt(i, m4); });
   rockIm.castShadow = true; rockIm.receiveShadow = true; if (rocks.length) world.add(rockIm);
   // distant hills
-  const hillMat = new THREE.MeshStandardMaterial({ color: 0x6f7f63, roughness: 1, flatShading: true });
-  for (let i = 0; i < 30; i++) { const a = i / 30 * TAU, rr = (arena ? 260 : S * 0.95) + (i % 3) * 40, h = 60 + (i * 37 % 70); const hill = new THREE.Mesh(new THREE.ConeGeometry(90 + (i * 13 % 60), h, 6), hillMat); hill.position.set(S / 2 + Math.cos(a) * rr, h / 2 - 4, S / 2 + Math.sin(a) * rr); world.add(hill); }
+  const hillMat = new THREE.MeshLambertMaterial({ color: 0x5f7558 }); // distant wooded hills, softened by haze
+  for (let i = 0; i < 30; i++) { const a = i / 30 * TAU, rr = (arena ? 260 : S * 0.95) + (i % 3) * 40, h = 60 + (i * 37 % 70); const rad = 110 + (i * 13 % 70), hill = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 8, 0, TAU, 0, Math.PI / 2), hillMat); hill.scale.set(rad, h * 0.75, rad * (0.8 + (i % 4) * 0.12)); hill.rotation.y = i; hill.position.set(S / 2 + Math.cos(a) * rr, -6, S / 2 + Math.sin(a) * rr); world.add(hill); }
   buildLoot();
   for (const v of MAP.vehicles) makeVehicleMesh(v);
   initSkids();
-  zoneWall = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 128, 1, true), new THREE.MeshBasicMaterial({ color: 0x8a4cff, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false, fog: false }));
+  zoneWall = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 128, 1, true), new THREE.MeshBasicMaterial({ color: 0x3a7dff, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false, fog: false }));
   world.add(zoneWall);
   nextRing = new THREE.Mesh(new THREE.RingGeometry(0.99, 1, 160), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false }));
   nextRing.rotation.x = -Math.PI / 2; nextRing.position.y = 0.1; world.add(nextRing);
@@ -888,7 +911,7 @@ function grassGeo() {
     const a = R() * TAU, r = R() * 0.16, h = 0.2 + R() * 0.26, w = 0.014 + R() * 0.012, lean = 0.06 + R() * 0.14, x = Math.cos(a) * r, z = Math.sin(a) * r;
     const fa = R() * TAU, fx = Math.cos(fa) * w, fz = Math.sin(fa) * w, tx = x + Math.cos(a) * lean, tz = z + Math.sin(a) * lean;
     P.push(x - fx, 0, z - fz, x + fx, 0, z + fz, tx, h, tz);
-    const tip = 0.85 + R() * 0.3; C.push(0.05, 0.085, 0.02, 0.05, 0.085, 0.02, 0.17 * tip, 0.25 * tip, 0.06 * tip);
+    const tip = 0.85 + R() * 0.3; C.push(0.045, 0.07, 0.022, 0.045, 0.07, 0.022, 0.15 * tip, 0.2 * tip, 0.065 * tip);
     N.push(0, 1, 0, 0, 1, 0, 0, 1, 0);
   }
   const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(P, 3)); g.setAttribute("color", new THREE.Float32BufferAttribute(C, 3)); g.setAttribute("normal", new THREE.Float32BufferAttribute(N, 3));
@@ -4505,7 +4528,7 @@ function render(dt) {
   }
   grassTick(ex, ez, ce.ph === "plane" ? 999 : camera.position.y);
   // sun follows the player
-  sun.position.set(ex + 40, 80, ez + 25); sun.target.position.set(ex, 0, ez);
+  sun.position.set(ex + SUN_DIR.x * 95, SUN_DIR.y * 95, ez + SUN_DIR.z * 95); sun.target.position.set(ex, 0, ez);
   // effects
   fxTick(dt);
   hurt = Math.max(0, hurt - dt * 2); $("hurt").style.opacity = hurt * 0.6;
@@ -4893,7 +4916,7 @@ function frame(now) {
 }
 applyQuality();
 // tiny version tag in the corner, so it's easy to tell whether the newest update has loaded
-{ const vt = document.createElement("div"); vt.textContent = "v21"; vt.style.cssText = "position:fixed;left:6px;bottom:3px;font:10px sans-serif;color:#fff;opacity:.45;pointer-events:none;z-index:99"; document.body.append(vt); }
+{ const vt = document.createElement("div"); vt.textContent = "v22"; vt.style.cssText = "position:fixed;left:6px;bottom:3px;font:10px sans-serif;color:#fff;opacity:.45;pointer-events:none;z-index:99"; document.body.append(vt); }
 camera.position.set(0, 30, 0); camera.lookAt(10, 0, 10);
 requestAnimationFrame(frame);
 window.__dbg = { dmg: (t, d, k) => applyDamage(t, d, k || null, k ? "x" : "", 2, false), ts: () => TS, revive: (a, b) => startRevive(a, b), startDrop: (i) => startDrop(i), drops: () => drops, redz, setMarker: (p) => setMarker(p) };
