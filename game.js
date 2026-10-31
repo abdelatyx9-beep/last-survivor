@@ -526,7 +526,7 @@ const scene = new THREE.Scene();
 const SKY = new THREE.Color(0xa9c7d8);
 scene.background = SKY;
 scene.fog = new THREE.Fog(SKY, 90, 420);
-const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 2600);
+const camera = new THREE.PerspectiveCamera(62, 1, 0.06, 2600);
 const hemi = new THREE.HemisphereLight(0xdfeefa, 0x5b5a3c, 0.85); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff1d6, 2.2);
 sun.castShadow = true;
@@ -2667,7 +2667,7 @@ function disposeVisual(v) { if (!v) return; scene.remove(v.holder); v.mixer.stop
 // ---------------- game state ----------------
 let mode = "menu", online = false, isHost = false;
 let ents = [], me = null, feedEl = $("feed"), matchT = 0, matchStartWall = 0, ended = false, deathRank = 0, aliveCache = -1;
-let camColl = 3.4;
+let camColl = 3.4, camShK = 0.6, camShS = 0.6;
 let camYaw = 0, camPitch = 0.12, camYawT = 0, camPitchT = 0.12, camDist = 3.4, aimZoom = false, camH = 1.55, shadowsOff = false;
 let lastZoneHurt = 0, zoneWarned = -1, tutorial = null;
 
@@ -4411,13 +4411,23 @@ function render(dt) {
   const rx = -Math.sin(camYaw), rz = Math.cos(camYaw), sh = (inAir || ce.veh ? 0 : aimZoom ? 0.45 : 0.6) + (ce.lean || 0) * 0.5;
   let want = dist;
   if (ce.ph === "ground") { // keep the camera out of walls
-    const o = tmpV.set(camTarget.x + rx * sh, camTarget.y, camTarget.z + rz * sh), d = tmpV2.set(-dx, -dy, -dz);
-    for (const ob of near(ce.x, ce.y, dist + 2)) { if (ob.t !== "r" || ob.kind === "fence" || (ob.kind === "door" && ob.open) || (ce.veh && ob.h3 < 2)) continue; const t = rayBox(o, d, ob.x - 0.1, (ob.z0 || 0) - 0.12, ob.y - 0.1, ob.x + ob.w + 0.1, ob.h3 + 0.12, ob.y + ob.h + 0.1); if (t < want) want = Math.max(0.5, t - 0.25); }
+    // five rays (centre + a small cross around it) so the edges of the view can't poke through a wall either
+    const obs = near(ce.x, ce.y, dist + 2).filter((ob) => !(ob.t !== "r" || ob.kind === "fence" || (ob.kind === "door" && ob.open) || (ce.veh && ob.h3 < 2)));
+    const d = tmpV2.set(-dx, -dy, -dz), ux = Math.sin(pitch) * Math.cos(camYaw), uy = Math.cos(pitch), uz = Math.sin(pitch) * Math.sin(camYaw);
+    const inBox = (p, m) => obs.some((ob) => p.x > ob.x - m && p.x < ob.x + ob.w + m && p.z > ob.y - m && p.z < ob.y + ob.h + m && p.y > (ob.z0 || 0) - m && p.y < ob.h3 + m);
+    let shK = sh; { const o0 = tmpV.set(camTarget.x + rx * sh, camTarget.y, camTarget.z + rz * sh); if (inBox(o0, 0.12)) shK = 0; } // hugging a wall on the right: pull the camera behind the head
+    camShK = shK;
+    const R = 0.22;
+    for (const [a, b2] of [[0, 0], [R, 0], [-R, 0], [0, R], [0, -R]]) {
+      const o = tmpV.set(camTarget.x + rx * (shK + a) + ux * b2, camTarget.y + uy * b2, camTarget.z + rz * (shK + a) + uz * b2);
+      for (const ob of obs) { const t = rayBox(o, d, ob.x - 0.06, (ob.z0 || 0) - 0.08, ob.y - 0.06, ob.x + ob.w + 0.06, ob.h3 + 0.08, ob.y + ob.h + 0.06); if (t < want) want = Math.max(0.12, t - 0.12); }
+    }
   }
   // walls pull the camera in at once (never clip through), but it eases back out instead of popping
   camColl = want < camColl ? want : lerp(camColl, want, 1 - Math.exp(-dt * 4)); want = camColl;
   shake = Math.max(0, shake - dt * 2.5); const sk = shake * 0.12;
-  camera.position.set(camTarget.x + rx * sh - dx * want + (Math.random() - 0.5) * sk, Math.max(0.35, camTarget.y - dy * want) + (Math.random() - 0.5) * sk, camTarget.z + rz * sh - dz * want + (Math.random() - 0.5) * sk);
+  const shU = ce.ph === "ground" ? (camShS = lerp(camShS, camShK, 1 - Math.exp(-dt * 10))) : sh;
+  camera.position.set(camTarget.x + rx * shU - dx * want + (Math.random() - 0.5) * sk, Math.max(0.35, camTarget.y - dy * want) + (Math.random() - 0.5) * sk, camTarget.z + rz * shU - dz * want + (Math.random() - 0.5) * sk);
   camera.lookAt(camera.position.x + dx, camera.position.y + dy, camera.position.z + dz);
   // when a wall pushes the camera right up to your head, hide your own body instead of filling the screen with it
   if (me.vis && ce === me && !fpsCam) { const tooClose = camera.position.distanceTo(_sv2.set(me.x, (me.z || 0) + 1.45, me.y)) < 0.85; if (tooClose) me.vis.holder.visible = false; }
@@ -4819,6 +4829,8 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 applyQuality();
+// tiny version tag in the corner, so it's easy to tell whether the newest update has loaded
+{ const vt = document.createElement("div"); vt.textContent = "v19"; vt.style.cssText = "position:fixed;left:6px;bottom:3px;font:10px sans-serif;color:#fff;opacity:.45;pointer-events:none;z-index:99"; document.body.append(vt); }
 camera.position.set(0, 30, 0); camera.lookAt(10, 0, 10);
 requestAnimationFrame(frame);
 window.__dbg = { dmg: (t, d, k) => applyDamage(t, d, k || null, k ? "x" : "", 2, false), ts: () => TS, revive: (a, b) => startRevive(a, b), startDrop: (i) => startDrop(i), drops: () => drops, redz, setMarker: (p) => setMarker(p) };
