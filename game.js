@@ -2576,7 +2576,7 @@ function teamInit() {
 
 // ---------------- soldier model ----------------
 let soldierGltf = null;
-const SUITS = [{ id: "op", name: "عمليات", url: window.OP_URL || "models/op.glb", gltf: null }, { id: "swat", name: "قوات خاصة", url: window.SOLDIER_URL || "models/swat.glb", gltf: null }, { id: "camo", name: "مموّه", url: window.CAMO_URL || "models/camo.glb", gltf: null }];
+const SUITS = [{ id: "op", name: "عمليات", url: window.OP_URL || "models/op.glb", gltf: null }, { id: "opb", name: "قوات سوداء", url: window.OPB_URL || "models/op_swat.glb", gltf: null }, { id: "fsb", name: "مموّه أخضر", url: window.FSB_URL || "models/op_fsb.glb", gltf: null }, { id: "swat", name: "قوات خاصة", url: window.SOLDIER_URL || "models/swat.glb", gltf: null }, { id: "camo", name: "مموّه", url: window.CAMO_URL || "models/camo.glb", gltf: null }];
 function prepModel(g) {
   // a generous bounding sphere per body part, so characters off screen are skipped by the renderer
   g.scene.updateMatrixWorld(true);
@@ -2618,7 +2618,7 @@ function makeVisual(e) {
   const root = SkeletonUtils.clone(G.scene);
   const tint = new THREE.Color(e.tint || "#ffffff");
   root.traverse((o) => {
-    if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; o.frustumCulled = false; if (e.tint && e.tint !== "#ffffff" && o.material && !/visor|head/i.test(o.material.name)) { o.material = o.material.clone(); o.material.color.multiply(tint); } }
+    if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; o.frustumCulled = false; if (e.tint && e.tint !== "#ffffff" && o.material && !/^Op_/.test(o.name) && !/visor|head/i.test(o.material.name)) { o.material = o.material.clone(); o.material.color.multiply(tint); } }
   });
   const holder = new THREE.Group(); holder.add(root); root.rotation.y = FACE;
   // light copies of the body for soldiers far away
@@ -2690,7 +2690,7 @@ function startMatch(seed, opts) {
   me = newEnt("me", nick, "me"); me.color = opts.color || NET_COLORS[0]; me.tint = myOutfit().c; me.suit = mySuit(); me.team = 0; ents.push(me); awarded = false;
   const names = BOT_NAMES.slice().sort(() => MAP.R() - 0.5);
   for (let i = 0; i < opts.bots; i++) {
-    const b = newEnt("b" + i, names[i % names.length], "bot"); b.tint = TINTS[1 + (i % (TINTS.length - 1))]; { const r = MAP.R(); b.suit = r < 0.55 ? "op" : r < 0.8 ? "camo" : "swat"; }
+    const b = newEnt("b" + i, names[i % names.length], "bot"); b.tint = TINTS[1 + (i % (TINTS.length - 1))]; { const r = MAP.R(); b.suit = r < 0.36 ? "op" : r < 0.68 ? "opb" : r < 0.96 ? "fsb" : "camo"; }
     b.jumpAt = MAP.plane.dur * (0.08 + MAP.R() * 0.84); b.skill = 0.5 + MAP.R() * 0.4; ents.push(b);
     if (arena) { b.team = i < ARENA.team - 1 ? 0 : 1; b.tint = b.team === 0 ? "#9fb4d8" : "#d89a8a"; b.skill = 0.45 + MAP.R() * 0.35; }
   }
@@ -3460,7 +3460,7 @@ function profileUi() {
       el.append(b);
     });
   };
-  sw(SUITS.map((x) => ({ id: x.id, name: x.name, c: x.id === "camo" ? "#7d8466" : x.id === "op" ? "#8a7d5c" : "#3d5a78", lv: 1 })), $("suitList"), (o) => o.id === mySuit(), (o) => { PROFILE.suit = o.id; PROFILE.suitV = 2; setTimeout(setupLobbyModel, 0); }, true);
+  sw(SUITS.map((x) => ({ id: x.id, name: x.name, c: ({ camo: "#7d8466", op: "#8a7d5c", opb: "#2e3236", fsb: "#4f5e3f" })[x.id] || "#3d5a78", lv: 1 })), $("suitList"), (o) => o.id === mySuit(), (o) => { PROFILE.suit = o.id; PROFILE.suitV = 2; setTimeout(setupLobbyModel, 0); }, true);
   sw(OUTFITS, $("outfitList"), (o) => o.id === PROFILE.outfit, (o) => (PROFILE.outfit = o.id), true);
   sw(CHUTES, $("chuteList"), (o, i) => i === PROFILE.chute, (o, i) => (PROFILE.chute = i));
   sw(GUNSKINS, $("gunList"), (o, i) => i === PROFILE.gun, (o, i) => (PROFILE.gun = i));
@@ -3872,7 +3872,7 @@ function vmBuild(wi) {
   const P = gunParts(wi, GUNSKINS[PROFILE.gun].c, lv);
   vm.gun = P.g; vm.muzzle.copy(P.muzzle); vm.sightY = P.sightY; vm.glow = P.glow;
   vm.root.add(P.g);
-  const sleeve = myOutfit().c === "#ffffff" ? (mySuit() === "camo" ? 0x6b6e66 : mySuit() === "op" ? 0x7a6f55 : 0x3e5d7c) : new THREE.Color(myOutfit().c).multiplyScalar(0.7);
+  const sleeve = myOutfit().c === "#ffffff" ? (({ camo: 0x6b6e66, op: 0x7a6f55, opb: 0x34383c, fsb: 0x4f5a3c })[mySuit()] || 0x3e5d7c) : new THREE.Color(myOutfit().c).multiplyScalar(0.7);
   const R = armMesh(1, sleeve); R.position.set(0.0, -0.025, 0.04); R.rotation.set(0.25, -0.08, 0.1); P.g.add(R);
   const L = armMesh(-1, sleeve); const lz = wi === 0 ? 0.0 : wi === 1 ? -0.17 : -0.36; L.position.set(-0.035, 0.0, lz); L.rotation.set(0.5, 0.55, -0.6); P.g.add(L);
   vm.swapT = 0.35;
@@ -4727,7 +4727,7 @@ function beginOnline(go, peers) {
   const remotes = [];
   for (const p of peers) {
     if (p.isMe && p.sameTab) continue; const pr = p.presence || {}; if (pr.st !== "lobby" && pr.st !== "play") continue;
-    const r = newEnt(p.peer, String(pr.n || "لاعب").slice(0, 14), "remote"); r.color = /^#[0-9a-f]{6}$/i.test(pr.c) ? pr.c : "#ccc"; r.tint = /^#[0-9a-f]{6}$/i.test(pr.tn) ? pr.tn : "#c9d6ff"; r.suit = ["op", "camo", "swat"].includes(pr.sm) ? pr.sm : "op"; remotes.push(r);
+    const r = newEnt(p.peer, String(pr.n || "لاعب").slice(0, 14), "remote"); r.color = /^#[0-9a-f]{6}$/i.test(pr.c) ? pr.c : "#ccc"; r.tint = /^#[0-9a-f]{6}$/i.test(pr.tn) ? pr.tn : "#c9d6ff"; r.suit = ["op", "opb", "fsb", "camo", "swat"].includes(pr.sm) ? pr.sm : "op"; remotes.push(r);
   }
   show(null); startMatch(go.seed >>> 0, { bots: go.nb, t0: go.t0, color: myColor, ts: go.ts || 1, teams: go.teams || {}, myId: myPeer, remotes });
   myState = "play"; room.presence({ st: "play", go: isHost ? go : null }).catch(() => {});
@@ -4830,7 +4830,7 @@ function frame(now) {
 }
 applyQuality();
 // tiny version tag in the corner, so it's easy to tell whether the newest update has loaded
-{ const vt = document.createElement("div"); vt.textContent = "v19"; vt.style.cssText = "position:fixed;left:6px;bottom:3px;font:10px sans-serif;color:#fff;opacity:.45;pointer-events:none;z-index:99"; document.body.append(vt); }
+{ const vt = document.createElement("div"); vt.textContent = "v20"; vt.style.cssText = "position:fixed;left:6px;bottom:3px;font:10px sans-serif;color:#fff;opacity:.45;pointer-events:none;z-index:99"; document.body.append(vt); }
 camera.position.set(0, 30, 0); camera.lookAt(10, 0, 10);
 requestAnimationFrame(frame);
 window.__dbg = { dmg: (t, d, k) => applyDamage(t, d, k || null, k ? "x" : "", 2, false), ts: () => TS, revive: (a, b) => startRevive(a, b), startDrop: (i) => startDrop(i), drops: () => drops, redz, setMarker: (p) => setMarker(p) };

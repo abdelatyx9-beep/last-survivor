@@ -1,6 +1,6 @@
 // يخلي اللعبة تشتغل بدون إنترنت بعد أول فتح
 // لما تعدّل اللعبة، غيّر رقم النسخة هنا عشان الجوالات تاخذ التحديث
-const VERSION = "ls3d-v19";
+const VERSION = "ls3d-v20";
 const BASE = self.registration.scope;               // يشتغل على Vercel و GitHub Pages
 const u = (p) => new URL(p, BASE).href;
 const CORE = ["", "index.html", "game.js", "config.js", "net-supabase.js", "manifest.webmanifest", "vendor/three.module.min.js", "vendor/jsm/loaders/GLTFLoader.js", "vendor/jsm/utils/BufferGeometryUtils.js", "vendor/jsm/utils/SkeletonUtils.js", "models/op.glb", "models/swat.glb", "models/camo.glb", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"].map(u);
