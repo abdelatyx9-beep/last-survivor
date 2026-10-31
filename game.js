@@ -574,7 +574,17 @@ const roadTex = canvasTex(64, 256, (g, w, h) => {
   for (let i = 0; i < 1400; i++) { g.fillStyle = `rgba(${Math.random() < 0.5 ? 255 : 0},${Math.random() < 0.5 ? 255 : 0},0,0.05)`; g.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
   g.fillStyle = "rgba(240,230,190,0.7)"; for (let y = 0; y < h; y += 64) g.fillRect(w / 2 - 1.5, y, 3, 32);
 });
-const wallTex = canvasTex(256, 128, (g, w, h) => {
+const wallTex = canvasTex(256, 256, (g, w, h) => {
+  const up = Math.round(h * 0.64);
+  g.fillStyle = "#d8ccb3"; g.fillRect(0, 0, w, up);
+  for (let i = 0; i < 1800; i++) { g.fillStyle = `rgba(${Math.random() < 0.5 ? 255 : 90},${Math.random() < 0.5 ? 240 : 80},${Math.random() < 0.5 ? 220 : 60},0.05)`; g.fillRect(Math.random() * w, Math.random() * up, 3, 3); }
+  const gr = g.createLinearGradient(0, 0, 0, up); gr.addColorStop(0, "rgba(0,0,0,0.10)"); gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(0, 0, w, up);
+  g.fillStyle = "#7b6650"; g.fillRect(0, up, w, h - up);
+  for (let x = 0; x < w; x += 64) { g.fillStyle = "rgba(0,0,0,0.18)"; g.fillRect(x, up + 10, 2, h - up - 22); g.fillStyle = "rgba(255,255,255,0.08)"; g.fillRect(x + 2, up + 10, 2, h - up - 22); }
+  g.fillStyle = "#e9e0cc"; g.fillRect(0, up - 4, w, 6); g.fillStyle = "rgba(0,0,0,0.25)"; g.fillRect(0, up + 2, w, 2);
+  g.fillStyle = "#3e3226"; g.fillRect(0, h - 12, w, 12);
+});
+const _oldWallTex = canvasTex(4, 4, (g, w, h) => {
   g.fillStyle = "#fff"; g.fillRect(0, 0, w, h);
   for (let i = 0; i < 2500; i++) { g.fillStyle = `rgba(0,0,0,${Math.random() * 0.06})`; g.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
   g.strokeStyle = "rgba(0,0,0,0.08)"; for (let y = 16; y < h; y += 16) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
@@ -717,7 +727,7 @@ function buildWorld() {
   const MATS = {
     ext_plaster: () => ({ map: TEX.plaster, roughness: 0.92 }), ext_brick: () => ({ map: TEX.brick, roughness: 0.92 }), ext_concrete: () => ({ map: TEX.concrete, roughness: 0.92 }),
     ext_panel: () => ({ map: TEX.panel, roughness: 0.8 }), ext_sand: () => ({ map: TEX.sand, roughness: 0.95 }), ext_cream: () => ({ map: TEX.cream, roughness: 0.95 }), ext_metal: () => ({ map: TEX.metal, roughness: 0.9, metalness: 0, color: 0xeef1f3 }),
-    int: () => ({ map: wallTex, color: 0xe6dccb, roughness: 0.95, emissive: 0x1a1712 }), slab: () => ({ map: TEX.floor, roughness: 0.8, emissive: 0x120d08 }),
+    int: () => ({ map: wallTex, color: 0xffffff, roughness: 0.95, emissive: 0x0d0b08 }), slab: () => ({ map: TEX.floor, roughness: 0.8, emissive: 0x120d08 }),
     stair: () => ({ color: 0x9a968c, roughness: 0.95 }), rail: () => ({ color: 0x3a3a3a, roughness: 0.5, metalness: 0.6 }), par: () => ({ color: 0xa8a49a, roughness: 1 }),
     ac: () => ({ map: TEX.metal, color: 0xcfd3d6, roughness: 0.6, metalness: 0.3 }), ceil: () => ({ color: 0xd9d4c8, roughness: 1 }), tank: () => ({ color: 0xd8d8d0, roughness: 0.5, metalness: 0.4 }),
     frame: () => ({ color: 0xeeeae0, roughness: 0.7 }), glass: () => ({ color: 0x6f9cc0, roughness: 0.08, metalness: 0.7, transparent: true, opacity: 0.38, depthWrite: false }),
@@ -1042,20 +1052,20 @@ function footsteps(e, moved) {
     puff(new THREE.Vector3(e.x - Math.sin(e.a) * sd - Math.cos(e.a) * 0.15, 0.08, e.y + Math.cos(e.a) * sd - Math.sin(e.a) * 0.15), 0xb9a882, 0.35, 0.5);
   }
   if (e === me) { noise(0.018, 0.05, 700, 180); return; }
-  const dx = e.x - me.x, dy = e.y - me.y, d = Math.hypot(dx, dy) + Math.abs(e.z - me.z) * 1.5, hear = e.stance === "crouch" ? 14 : 34;
+  const dx = e.x - me.x, dy = e.y - me.y, d = Math.hypot(dx, dy) + Math.abs(e.z - me.z) * 1.5, hear = e.stance === "crouch" ? 10 : 26;
   if (d > hear || !me.alive || me.ph !== "ground") return;
   const fx = Math.cos(camYaw), fy = Math.sin(camYaw), rx = -Math.sin(camYaw), ry = Math.cos(camYaw);
   const side = (dx * rx + dy * ry) / (d || 1), ahead = (dx * fx + dy * fy) / (d || 1);
   const k = Math.pow(1 - d / hear, 1.6);
   noise(0.11 * k + 0.008, 0.07, 650, 150, side);
   // on-screen footprint pointing to where the steps come from
-  if (d > 3) {
+  if (d > 3 && d < 22 && !friends(e, me) && performance.now() - (e.stepIcoT || 0) > 900 && $("steps").children.length < 3) {
+    e.stepIcoT = performance.now();
     const el = document.createElement("i"); el.className = "step";
     const ang = Math.atan2(side, ahead);
-    el.style.transform = `translate(-50%,-50%) rotate(${ang}rad) translateY(-118px)`;
-    el.style.opacity = 0.35 + k * 0.6;
+    el.style.transform = `translate(-50%,-50%) rotate(${ang}rad) translateY(-150px)`;
+    el.style.opacity = 0.25 + k * 0.45;
     $("steps").append(el); setTimeout(() => el.remove(), 600);
-    if ($("steps").children.length > 10) $("steps").firstChild.remove();
   }
 }
 
@@ -4316,10 +4326,11 @@ function render(dt) {
       const combat = (e === me && aimZoom) || e.shotT > 0.6 || (e.kind === "bot" && !!e.seen) || e.reloadT > 0;
       const kneelReload = st === "crouch" && e.reloadT > 0 && !e.moving && !!v.acts.kneel;
       const pick = e.climb ? "sprint" : e.ph !== "ground" || e.onGround === false || e.veh || e.knocked ? "idle" : kneelReload ? "kneel"
-        : e.moving ? (st !== "stand" || e.healT > 0 || (e === me && aimZoom) ? "walk" : combat ? "run" : "sprint") : "idle";
+        // real (motion-captured) upright walk and run; the bent tactical walk only when crouched
+        : e.moving ? (st !== "stand" ? "walk" : e.healT > 0 || (e === me && aimZoom) || spd < 3 ? "walkup" : "sprint") : "idle";
       setAnim(v, pick);
       // play the legs at the speed the body really moves
-      const nominal = { walk: 2.4, run: 4.6, sprint: 5.6, walkup: 1.6, strafe: 2.2 }[v.cur];
+      const nominal = { walk: 2.4, run: 4.6, sprint: 5.2, walkup: 1.7, strafe: 2.2 }[v.cur];
       let mva = Math.atan2(v.vy, v.vx) - e.a; mva = Math.atan2(Math.sin(mva), Math.cos(mva));
       const back = spd > 0.4 && Math.abs(mva) > 2.0;
       if (nominal && v.acts[v.cur]) v.acts[v.cur].timeScale = (st === "prone" ? 0.5 : clamp(spd / nominal, 0.55, 1.7)) * (back ? -1 : 1);
@@ -4389,7 +4400,8 @@ function render(dt) {
   if (ce !== me) { let da = ce.a - camYawT; da = Math.atan2(Math.sin(da), Math.cos(da)); camYawT += da * Math.min(1, dt * 4); camPitchT = lerp(camPitchT, (ce.aimP || 0) + 0.08, Math.min(1, dt * 3)); }
   const inAir = ce.ph !== "ground";
   const vsp = ce.veh ? Math.hypot(ce.veh.vx, ce.veh.vy) : 0;
-  const dist = ce.ph === "plane" ? 44 : ce.ph === "para" ? (ce.z > 32 ? 9 : 6) : ce.veh ? 6.6 + vsp * 0.05 : aimZoom ? 1.6 : camDist;
+  const indoor = ce.ph === "ground" && !ce.veh && insideBuilding(ce.x, ce.y);
+  const dist = ce.ph === "plane" ? 44 : ce.ph === "para" ? (ce.z > 32 ? 9 : 6) : ce.veh ? 6.6 + vsp * 0.05 : aimZoom ? 1.6 : indoor ? Math.min(camDist, 2.5) : camDist;
   const ex = ce.ph === "plane" ? planeMesh.position.x : ce.x, ey = ce.ph === "plane" ? 114 : ce.z, ez = ce.ph === "plane" ? planeMesh.position.z : ce.y;
   camH = lerp(camH, ce.veh ? 2.2 : ce.ph !== "ground" ? 1.55 : ce.stance === "prone" ? 0.75 : ce.stance === "crouch" ? 1.15 : 1.55, 1 - Math.exp(-dt * 8));
   const ky = 1 - Math.exp(-dt * (document.pointerLockElement ? 45 : 26)); // smooth camera turning
