@@ -261,12 +261,17 @@ function navPath(from, to) {
 
 // ---------------- map ----------------
 let MAP = null;
+// downtown district ("CCity Building Set 1" by Neberkenezer, CC BY 4.0): solid blocks of its buildings, metres in the model's own frame
+const CITY_BOXES = [[-224,-92.5,12,12,3.2],[-212,-92.5,6,12,3.2],[-212,-98.5,6,6,3.2],[-224,-98.5,12,6,3.2],[-187.5,-89,10.98,8.55,4],[-187.5,-98,10.98,9,4],[-176,-92.5,12,12,3.2],[-176,-98.5,24,18,3.2],[-197,-98.5,8.98,6,4],[-205.98,-98.5,8.98,6,4],[-206,-92.5,18,12,4.5],[-97.98,-125.05,6.64,8.09,4],[-97.98,-134.05,6.64,8.09,4],[-91,-133.89,10.98,17.55,14.5],[26.62,-98.73,37.58,18.57,19.71],[-278.26,-99.11,18.44,20.6,14.12],[-314,-97,17,15,6.7],[-320.5,-95,6.5,11,25.2],[-325.5,-96,5,13,28.2],[-332,-95,6.5,11,25.2],[-349,-97,17,15,6.7],[-170,-133,17,15,6.7],[-176.5,-131,6.5,11,25.2],[-181.5,-132,5,13,28.2],[-188,-131,6.5,11,25.2],[-205,-133,17,15,6.7],[-128,-110.5,12,12,3.2],[-128,-116.5,12,6,3.2],[-134,-116.5,6,6,3.2],[-134,-110.5,6,12,3.2],[-133.5,-98,12,10.7,5.91],[-61,-97.5,17,13,9.36],[-26,-97.5,18,16,12.5],[-44,-97.5,18,16,12.5],[-34.31,-84.75,2.09,2.07,3.87],[-22,-151.5,13,17,9.36],[-25,-116.5,16,18,12.5],[-25,-134.5,16,18,12.5],[-23.82,-124.81,2.07,2.09,3.87],[-259.65,-98.15,17.3,15.3,3.95],[-132.5,-170.5,15,17,6.7],[-130.5,-177,11,6.5,25.2],[-131.5,-182,13,5,28.2],[-130.5,-188.5,11,6.5,25.2],[-132.5,-205.5,15,17,6.7],[-133.65,-134.15,15.3,17.3,3.95],[-60.97,-116.72,8.09,6.64,4],[-51.97,-116.72,8.09,6.64,4],[-61.58,-109.74,17.55,10.98,14.5],[-206.34,-170.6,18.44,20.6,14.12],[-205.24,-117.28,8.09,6.64,4],[-196.24,-117.28,8.09,6.64,4],[-205.85,-110.3,17.55,10.98,14.5],[-99.86,-170.76,20.6,18.44,14.12],[-97.5,-197,10.98,8.55,4],[-97.5,-206,10.98,9,4],[-86,-200.5,12,12,3.2],[-86,-206.5,24,18,3.2],[-79.65,-170.15,17.3,15.3,3.95]];
+const CITY_AT = { ox: 590, oy: 760, x0: 204, y0: 535, x1: 762, y1: 770 };
 function genMap(seed) {
   S = 800; const R = rng(seed); doorSeq = 0;
   const obs = [], blds = [], loot = [], roads = [], fields = [], cars = [], poles = [], vehicles = [];
   let lootId = 0;
+  const C = CITY_AT, inCity = (x, y, m = 0) => x > C.x0 - m && x < C.x1 + m && y > C.y0 - m && y < C.y1 + m;
   const free = (x, y, r) => {
     if (x < 10 || y < 10 || x > S - 10 || y > S - 10) return false;
+    if (inCity(x, y, r)) return false;
     for (const o of near2(obs, x, y, r + 30)) {
       if (o.t === "c") { if (Math.hypot(o.x - x, o.y - y) < o.r + r) return false; }
       else if (x > o.x - r && x < o.x + o.w + r && y > o.y - r && y < o.y + o.h + r) return false;
@@ -290,6 +295,7 @@ function genMap(seed) {
   const towns = [];
   for (let i = 0; i < 13; i++) for (let k = 0; k < 60; k++) {
     const x = 70 + R() * (S - 140), y = 70 + R() * (S - 140);
+    if (inCity(x, y, 85)) continue;
     if (towns.every((t) => Math.hypot(t.x - x, t.y - y) > 150)) { { const big = towns.length < 3 || R() < 0.25; towns.push({ x, y, n: big ? 8 + Math.floor(R() * 3) : 4 + Math.floor(R() * 4), big }); } break; }
   }
   const linked = new Set();
@@ -297,6 +303,11 @@ function genMap(seed) {
     const others = towns.map((t, j) => [j, Math.hypot(t.x - towns[i].x, t.y - towns[i].y)]).filter((p) => p[0] !== i).sort((a, b) => a[1] - b[1]).slice(0, 2);
     for (const [j] of others) { const key = Math.min(i, j) + "-" + Math.max(i, j); if (linked.has(key)) continue; linked.add(key); roads.push([towns[i].x, towns[i].y, towns[j].x, towns[j].y]); }
   }
+  // no country roads through downtown; one road leads from the nearest town to the city's main street
+  for (let i = roads.length - 1; i >= 0; i--) { const r = roads[i]; for (let k = 0; k <= 24; k++) { const t = k / 24; if (inCity(r[0] + (r[2] - r[0]) * t, r[1] + (r[3] - r[1]) * t, 6)) { roads.splice(i, 1); break; } } }
+  { const gate = { x: C.x0 - 4, y: C.oy - 70 }; let bt = null, bd = 1e9; for (const t of towns) { const d = Math.hypot(t.x - gate.x, t.y - gate.y); if (d < bd) { bd = d; bt = t; } } if (bt) roads.push([bt.x, bt.y, gate.x, gate.y]); }
+  // the downtown blocks
+  for (const [bx, bz, bw, bd2, bh] of CITY_BOXES) obs.push({ t: "r", kind: "city", x: C.ox + bx, y: C.oy + bz, w: bw, h: bd2, h3: bh });
   const roofCols = [0x8a3b2a, 0x6e3324, 0x5b4a3f, 0x7a4a2e, 0x4f5a5f];
   const doors = [];
   for (const t of towns) {
@@ -309,6 +320,7 @@ function genMap(seed) {
       const spread = t.big ? 150 : 100;
       const x = t.x + (R() - 0.5) * spread - w / 2, y = t.y + (R() - 0.5) * spread - h / 2;
       if (x < 16 || y < 16 || x + w > S - 16 || y + h > S - 16) continue;
+      if (inCity(x + w / 2, y + h / 2, Math.max(w, h) / 2 + 8)) continue;
       const pad = type === "house" || type === "house2" ? 11 : 9;
       if (blds.some((b) => x < b.x + b.w + pad && x + w + pad > b.x && y < b.y + b.h + pad && y + h + pad > b.y)) continue;
       const b = { x, y, w, h, type, st: D.st[0] + Math.floor(R() * (D.st[1] - D.st[0] + 1)), wallH: FH, tex: D.tex, roofKind: D.roof, roof: roofCols[Math.floor(R() * roofCols.length)] };
@@ -334,6 +346,7 @@ function genMap(seed) {
   for (let i = 0; i < 26; i++) {
     const w = 40 + R() * 60, h = 30 + R() * 50, x = 20 + R() * (S - w - 40), y = 20 + R() * (S - h - 40);
     if (towns.some((t) => Math.hypot(t.x - (x + w / 2), t.y - (y + h / 2)) < 95)) continue;
+    if (inCity(x + w / 2, y + h / 2, Math.max(w, h) / 2 + 5)) continue;
     fields.push({ x, y, w, h, rot: R() < 0.5 ? 0 : Math.PI / 2, c: R() < 0.6 ? 0 : 1 });
   }
   // shipping containers
@@ -372,6 +385,10 @@ function genMap(seed) {
   for (let i = 0; i < 650; i++) { const x = R() * S, y = R() * S; if (free(x, y, 3.5)) obs.push({ t: "c", kind: "tree", x, y, r: 0.45, s: 0.8 + R() * 0.7, h3: 7, pine: R() < 0.7 }); }
   for (let i = 0; i < 260; i++) { const r = 0.8 + R() * 1.8, x = R() * S, y = R() * S; if (free(x, y, r + 3)) obs.push({ t: "c", kind: "rock", x, y, r, h3: r * 1.1, rot: R() * TAU }); }
   for (let i = 0; i < 160; i++) { const x = R() * S, y = R() * S; if (free(x, y, 2.5)) addLoot(x, y, false); }
+  // loot and a few cars on the downtown streets
+  { const cityFree = (x, y, r) => inCity(x, y, -6) && !obs.some((o) => o.kind === "city" && x > o.x - r && x < o.x + o.w + r && y > o.y - r && y < o.y + o.h + r);
+    let n = 0; for (let i = 0; i < 500 && n < 55; i++) { const x = C.x0 + R() * (C.x1 - C.x0), y = C.y0 + R() * (C.y1 - C.y0); if (cityFree(x, y, 2)) { addLoot(x, y, false); n++; } }
+    let v = 0; for (let i = 0; i < 200 && v < 4; i++) { const x = C.x0 + R() * (C.x1 - C.x0), y = C.y0 + R() * (C.y1 - C.y0); if (cityFree(x, y, 4)) { addVeh(x, y, R() < 0.5 ? 0 : Math.PI); v++; } } }
 
   const zones = [{ x: S / 2, y: S / 2, r: S * 0.74 }];
   for (const p of PHASES) {
@@ -389,7 +406,7 @@ function genMap(seed) {
     for (let gx = Math.max(0, Math.floor(x0 / CELL)); gx <= Math.min(GN - 1, Math.floor(x1 / CELL)); gx++)
       for (let gy = Math.max(0, Math.floor(y0 / CELL)); gy <= Math.min(GN - 1, Math.floor(y1 / CELL)); gy++) grid[gy * GN + gx].push(o);
   }
-  return { seed, obs, blds, loot, roads, towns, zones, plane, grid, CELL, GN, R, fields, cars, poles, doors, vehicles };
+  return { seed, obs, blds, loot, roads, towns, zones, plane, grid, CELL, GN, R, fields, cars, poles, doors, vehicles, city: C };
 }
 // rough spatial helper used only while generating (before the grid exists)
 const genGrid = new Map();
@@ -900,6 +917,7 @@ function buildWorld() {
   nextRing = new THREE.Mesh(new THREE.RingGeometry(0.99, 1, 160), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false }));
   nextRing.rotation.x = -Math.PI / 2; nextRing.position.y = 0.1; world.add(nextRing);
   planeMesh = makePlane(); world.add(planeMesh);
+  if (MAP.city) addCity();
 }
 
 // ---- grass blades (instanced, swaying in the wind, placed around the camera) ----
@@ -935,6 +953,7 @@ const _gm = new THREE.Matrix4(), _gq = new THREE.Quaternion(), _gp = new THREE.V
 function grassOk(x, y) {
   if (x < 1 || y < 1 || x > S - 1 || y > S - 1) return false;
   if (onRoad(x, y) || insideBuilding(x, y)) return false;
+  if (MAP.city && x > MAP.city.x0 && x < MAP.city.x1 && y > MAP.city.y0 && y < MAP.city.y1) return false;
   for (const f of MAP.fields) if (!f.c && x > f.x && x < f.x + f.w && y > f.y && y < f.y + f.h) return false;
   return true;
 }
@@ -963,7 +982,13 @@ function grassTick(cx, cz, camY) {
   im.count = n; im.instanceMatrix.needsUpdate = true; im.instanceColor.needsUpdate = true;
 }
 
-let zoneWall = null, nextRing = null, planeMesh = null;
+let zoneWall = null, nextRing = null, planeMesh = null, cityGltf = null, cityLoading = false;
+function addCity() {
+  const put = () => { if (!MAP || !MAP.city || !world) return; const g = cityGltf.scene.clone(); g.position.set(MAP.city.ox, 0.03, MAP.city.oy); g.traverse((o) => { if (o.isMesh) { o.castShadow = !/Roads/i.test(o.name); o.receiveShadow = true; } }); world.add(g); };
+  if (cityGltf) { put(); return; }
+  if (cityLoading) return; cityLoading = true;
+  new GLTFLoader().load(window.CITY_URL || "models/city.glb", (g) => { cityGltf = g; cityLoading = false; put(); }, undefined, () => { cityLoading = false; });
+}
 function makePlane() {
   // four-engine military transport: high wing, T-tail, rear ramp; nose points along +x
   const g = new THREE.Group();
@@ -1740,11 +1765,14 @@ function buildGunGeo(type) {
   const meshes = Object.entries(L).map(([m, gs]) => [mergeGeometries(gs), m]);
   return { meshes, grip, fore, mag, kick, muzzle, rail };
 }
-function makeHeldGun(type, tintColor) {
-  const c = GUN_CACHE[type] || (GUN_CACHE[type] = buildGunGeo(type));
+// detailed rifle model (AKM with Zenitco parts) used for your own gun when it has loaded; same frame as the built-in rifle
+const HI_GUN = {};
+function setHiGun(type, meshes, anchors) { HI_GUN[type] = Object.assign({ meshes }, anchors); }
+function makeHeldGun(type, tintColor, hi) {
+  const c = (hi && HI_GUN[type]) || GUN_CACHE[type] || (GUN_CACHE[type] = buildGunGeo(type));
   const g = new THREE.Group();
   for (const [geo, m] of c.meshes) {
-    let mat = GUN_MAT[m];
+    let mat = typeof m === "string" ? GUN_MAT[m] : m;
     if (tintColor != null && (m === "poly" || m === "tan")) { mat = g.userData.tintMat || (g.userData.tintMat = mat.clone()); mat.color.set(tintColor); }
     const mesh = new THREE.Mesh(geo, mat); mesh.castShadow = true; g.add(mesh);
   }
@@ -2683,6 +2711,13 @@ const loadModel = new Promise((resolve, reject) => {
   }, reject);
 });
 loadModel.then(() => { $("loading").hidden = true; $("menuBtns").hidden = false; setupLobbyModel(); }).catch((err) => { console.error("load", err && (err.stack || err.message || err)); loadFailed(); });
+// the detailed AKM: loads in the background; anchors are where hands, mag, muzzle and optics sit (metres, gun frame)
+new GLTFLoader().load(window.AKM_URL || "models/akm.glb", (g) => {
+  const meshes = []; g.scene.updateMatrixWorld(true);
+  g.scene.traverse((o) => { if (o.isMesh) { o.material.envMapIntensity = 1.2; meshes.push([o.geometry, o.material]); } });
+  setHiGun("rifle", meshes, { grip: new THREE.Vector3(0, -0.02, 0.271), fore: new THREE.Vector3(0, 0.04, 0.6), mag: new THREE.Vector3(0, -0.05, 0.4), kick: 0.05, muzzle: new THREE.Vector3(0, 0.075, 0.872), rail: new THREE.Vector3(0, 0.12, 0.36) });
+  if (lobby.model) setTimeout(setupLobbyModel, 0);
+}, undefined, () => {});
 function loadFailed() {
   const l = $("loading"); l.textContent = "ما قدرنا نحمّل الجندي. تأكد من النت واضغط «حاول مرة ثانية». ";
   const b = document.createElement("button"); b.className = "btn"; b.type = "button"; b.textContent = "حاول مرة ثانية"; b.style.marginTop = "8px";
@@ -2712,7 +2747,7 @@ function makeVisual(e) {
   root.traverse((o) => { if (!o.isSkinnedMesh) return; if (/_LOD$/.test(o.parent && o.parent.name) || /_LOD$/.test(o.name)) { lodLo.push(o); o.visible = false; } else lodHi.push(o); });
   const rig = makeRig(root, holder);
   const guns = {}, gunTint = e.kind === "me" ? GUNSKINS[PROFILE.gun].c : null;
-  const gunFor = (cls) => { if (!guns[cls]) { guns[cls] = makeHeldGun(cls, gunTint); guns[cls].visible = false; holder.add(guns[cls]); } return guns[cls]; };
+  const gunFor = (cls) => { if (!guns[cls]) { guns[cls] = makeHeldGun(cls, gunTint, e.kind === "me"); guns[cls].visible = false; holder.add(guns[cls]); } return guns[cls]; };
   const gun = gunFor("rifle");
   const mixer = new THREE.AnimationMixer(root);
   const clip = (n) => G.animations.find((a) => a.name === n);
@@ -3648,7 +3683,7 @@ function setupLobbyModel() {
   const root = SkeletonUtils.clone(LG.scene);
   root.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; if (o.material && !/visor|head/i.test(o.material.name)) { o.material = o.material.clone(); o.userData.base = o.material.color.clone(); } } });
   const holder = new THREE.Group(); holder.add(root); root.rotation.y = FACE; holder.position.y = 0.16;
-  const gun = makeHeldGun("rifle", GUNSKINS[PROFILE.gun].c); lobby.gunMat = gun.userData.tintMat; holder.add(gun); lobby.gun = gun;
+  const gun = makeHeldGun("rifle", GUNSKINS[PROFILE.gun].c, true); lobby.gunMat = gun.userData.tintMat; holder.add(gun); lobby.gun = gun;
   lobby.rig = makeRig(root, holder);
   lobby.mixer = new THREE.AnimationMixer(root);
   const idle = LG.animations.find((a) => a.name === "Idle"); if (idle) lobby.mixer.clipAction(idle).play();
@@ -4552,6 +4587,7 @@ function renderMiniGround() {
   if (MAP.kind === "arena") { g.fillStyle = "#7d7366"; for (const l of [51.5, 107.5]) { g.fillRect(0, (l - 4.5) * k, 232, 9 * k); g.fillRect((l - 4.5) * k, 0, 9 * k, 232); } }
   g.strokeStyle = "#8f8467"; g.lineWidth = 3; for (const r of MAP.roads) { g.beginPath(); g.moveTo(r[0] * k, r[1] * k); g.lineTo(r[2] * k, r[3] * k); g.stroke(); }
   for (const f of MAP.fields) { g.fillStyle = f.c ? "#6f8a3c" : "#b9a25a"; g.fillRect(f.x * k, f.y * k, f.w * k, f.h * k); }
+  if (MAP.city) { const C = MAP.city; g.fillStyle = "#77746c"; g.fillRect(C.x0 * k, C.y0 * k, (C.x1 - C.x0) * k, (C.y1 - C.y0) * k); g.fillStyle = "#4b4a46"; for (const o of MAP.obs) if (o.kind === "city") g.fillRect(o.x * k, o.y * k, Math.max(1.5, o.w * k), Math.max(1.5, o.h * k)); }
   g.fillStyle = "#6b4f3a"; for (const b of MAP.blds) g.fillRect(b.x * k, b.y * k, Math.max(1.5, b.w * k), Math.max(1.5, b.h * k));
   g.fillStyle = "#3e5f2e"; for (const o of MAP.obs) if (o.kind === "tree") g.fillRect(o.x * k - 1, o.y * k - 1, 2, 2);
   return c;
@@ -4916,7 +4952,7 @@ function frame(now) {
 }
 applyQuality();
 // tiny version tag in the corner, so it's easy to tell whether the newest update has loaded
-{ const vt = document.createElement("div"); vt.textContent = "v22"; vt.style.cssText = "position:fixed;left:6px;bottom:3px;font:10px sans-serif;color:#fff;opacity:.45;pointer-events:none;z-index:99"; document.body.append(vt); }
+{ const vt = document.createElement("div"); vt.textContent = "v24"; vt.style.cssText = "position:fixed;left:6px;bottom:3px;font:10px sans-serif;color:#fff;opacity:.45;pointer-events:none;z-index:99"; document.body.append(vt); }
 camera.position.set(0, 30, 0); camera.lookAt(10, 0, 10);
 requestAnimationFrame(frame);
 window.__dbg = { dmg: (t, d, k) => applyDamage(t, d, k || null, k ? "x" : "", 2, false), ts: () => TS, revive: (a, b) => startRevive(a, b), startDrop: (i) => startDrop(i), drops: () => drops, redz, setMarker: (p) => setMarker(p) };
