@@ -489,6 +489,7 @@ function audio() {
   if (!SETTINGS.sound) return null;
   if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
   if (ac.state === "suspended") ac.resume();
+  if (!gunBufBusy) setTimeout(prepGunSounds, 0);
   return ac;
 }
 function noise(vol, dur, f0, f1, pan) {
@@ -509,7 +510,69 @@ function tone(freq, dur, type = "square", vol = 0.05, slide = 0) {
   o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur);
 }
 let lastSfx = 0;
-function shotSfx(w, k) { const n = performance.now(); if (n - lastSfx < 30) return; lastSfx = n; const v = WEAP[w].snd * 0.13 * k; if (v < 0.006) return; noise(v, 0.12 + WEAP[w].snd * 0.06, 3400 - WEAP[w].snd * 900, 180); noise(v * 0.5, 0.05, 6000, 2000); }
+// per weapon: blast brightness (Hz), blast length (s), low boom amount, boom pitch, echo length (s), mechanical click
+const GUNSND = [
+  { f: 5200, d: 0.07, boom: 0.35, bf: 140, tail: 0.9, click: 0.25 },  // pistol
+  { f: 4600, d: 0.065, boom: 0.4, bf: 120, tail: 0.9, click: 0.35 },  // smg
+  { f: 4200, d: 0.11, boom: 0.7, bf: 95, tail: 1.3, click: 0.3 },     // rifle
+  { f: 2600, d: 0.17, boom: 0.95, bf: 70, tail: 1.5, click: 0.15 },   // shotgun
+  { f: 3600, d: 0.22, boom: 1.0, bf: 60, tail: 2.0, click: 0.45 },    // sniper
+  { f: 3900, d: 0.14, boom: 0.85, bf: 80, tail: 1.6, click: 0.35 },   // dmr
+  { f: 3800, d: 0.12, boom: 0.8, bf: 85, tail: 1.4, click: 0.25 },    // lmg
+];
+const GUNBUF = {}; let gunBufBusy = false;
+async function renderGunshot(P, seed) {
+  const sr = 44100, len = Math.ceil((P.tail + 0.3) * sr), oc = new OfflineAudioContext(2, len, sr);
+  let rs = seed * 9301 + 49297; const rnd = () => ((rs = (rs * 9301 + 49297) % 233280) / 233280) * 2 - 1;
+  const nb = oc.createBuffer(1, len, sr), nd = nb.getChannelData(0); for (let i = 0; i < len; i++) nd[i] = rnd();
+  const dry = oc.createGain(); dry.gain.value = 1;
+  // 1) supersonic crack: a couple of milliseconds of very bright noise
+  { const s = oc.createBufferSource(), hp = oc.createBiquadFilter(), g = oc.createGain(); s.buffer = nb; hp.type = "highpass"; hp.frequency.value = 2500;
+    g.gain.setValueAtTime(1.0, 0); g.gain.exponentialRampToValueAtTime(0.001, 0.006); s.connect(hp).connect(g).connect(dry); s.start(0, 0.1); s.stop(0.01); }
+  // 2) muzzle blast: loud noise that darkens fast
+  { const s = oc.createBufferSource(), lp = oc.createBiquadFilter(), g = oc.createGain(); s.buffer = nb; lp.type = "lowpass"; lp.Q.value = 0.7;
+    lp.frequency.setValueAtTime(P.f * (0.9 + Math.abs(rnd()) * 0.2), 0); lp.frequency.exponentialRampToValueAtTime(260, P.d * 2.2);
+    g.gain.setValueAtTime(0.0001, 0); g.gain.exponentialRampToValueAtTime(0.95, 0.002); g.gain.exponentialRampToValueAtTime(0.18, P.d * 0.6); g.gain.exponentialRampToValueAtTime(0.0008, P.d * 3);
+    s.connect(lp).connect(g).connect(dry); s.start(0, 0.3); s.stop(P.d * 3 + 0.01); }
+  // 3) chest thump: falling low sine
+  { const o = oc.createOscillator(), g = oc.createGain(); o.type = "sine"; o.frequency.setValueAtTime(P.bf * 1.8, 0); o.frequency.exponentialRampToValueAtTime(P.bf * 0.45, 0.16);
+    g.gain.setValueAtTime(0.0001, 0); g.gain.exponentialRampToValueAtTime(P.boom, 0.004); g.gain.exponentialRampToValueAtTime(0.0008, 0.22); o.connect(g).connect(dry); o.start(0); o.stop(0.25); }
+  // 4) bolt / slide clack
+  if (P.click) { const s = oc.createBufferSource(), bp = oc.createBiquadFilter(), g = oc.createGain(); s.buffer = nb; bp.type = "bandpass"; bp.frequency.value = 3200; bp.Q.value = 4;
+    g.gain.setValueAtTime(0.0001, 0.028); g.gain.exponentialRampToValueAtTime(P.click, 0.03); g.gain.exponentialRampToValueAtTime(0.0005, 0.05); s.connect(bp).connect(g).connect(dry); s.start(0.028, 0.6); s.stop(0.06); }
+  // 5) outdoor echo: slap-backs off hills and houses + a long rumbling tail (convolution), slightly different left/right
+  const ir = oc.createBuffer(2, Math.ceil(P.tail * sr), sr);
+  for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < d.length; i++) { const t = i / sr; d[i] = rnd() * Math.exp(-t * (3.2 / P.tail) * 2.2) * (t < 0.02 ? t / 0.02 : 1); }
+    for (const [dt, a] of [[0.11 + c * 0.03, 0.5], [0.26 + c * 0.05, 0.35], [0.47 - c * 0.04, 0.22]]) { const k0 = Math.floor(dt * sr); for (let i = 0; i < 400 && k0 + i < d.length; i++) d[k0 + i] += rnd() * a * Math.exp(-i / 90); } }
+  const cv = oc.createConvolver(); cv.normalize = true; cv.buffer = ir;
+  const wlp = oc.createBiquadFilter(); wlp.type = "lowpass"; wlp.frequency.value = 1800; const wet = oc.createGain(); wet.gain.value = 0.55;
+  dry.connect(oc.destination); dry.connect(cv); cv.connect(wlp).connect(wet).connect(oc.destination);
+  const buf = await oc.startRendering();
+  let pk = 0; for (let c = 0; c < 2; c++) { const d = buf.getChannelData(c); for (let i = 0; i < d.length; i++) pk = Math.max(pk, Math.abs(d[i])); }
+  if (pk > 0) for (let c = 0; c < 2; c++) { const d = buf.getChannelData(c); for (let i = 0; i < d.length; i++) d[i] *= 0.92 / pk; }
+  return buf;
+}
+async function prepGunSounds() {
+  if (gunBufBusy || typeof OfflineAudioContext === "undefined") return; gunBufBusy = true;
+  try { for (let i = 0; i < GUNSND.length; i++) GUNBUF[i] = [await renderGunshot(GUNSND[i], i * 7 + 1), await renderGunshot(GUNSND[i], i * 7 + 4)]; } catch (e) { console.warn("gunshots", e); }
+}
+// k: 1 = right next to you, 0 = far away; pan: -1 left .. 1 right
+function shotSfx(w, k, pan) {
+  const n = performance.now(); if (n - lastSfx < 18) return; lastSfx = n;
+  const a = audio(); if (!a || k <= 0.01) return;
+  const bufs = GUNBUF[Math.min(w, GUNSND.length - 1)];
+  if (!bufs) { prepGunSounds(); const v = WEAP[w].snd * 0.13 * k; noise(v, 0.12 + WEAP[w].snd * 0.06, 3400 - WEAP[w].snd * 900, 180, pan); return; }
+  const s = a.createBufferSource(), lp = a.createBiquadFilter(), g = a.createGain(), t = a.currentTime;
+  s.buffer = bufs[(Math.random() * bufs.length) | 0]; s.playbackRate.value = 0.94 + Math.random() * 0.12;
+  // far shots lose their crack and sound dull, like in real life
+  lp.type = "lowpass"; lp.frequency.value = 700 + 19000 * k * k;
+  g.gain.value = Math.min(1, 0.62 * Math.pow(k, 1.4) * (0.8 + WEAP[w].snd * 0.25));
+  s.connect(lp).connect(g); let out = g;
+  if (pan !== undefined && a.createStereoPanner) { const p = a.createStereoPanner(); p.pan.value = clamp(pan, -1, 1); g.connect(p); out = p; }
+  out.connect(a.destination); s.start(t);
+}
+// left/right position of a sound relative to where the camera looks
+function panOf(x, y) { const dx = x - me.x, dy = y - me.y, d = Math.hypot(dx, dy) || 1; return clamp((dx * -Math.sin(camYaw) + dy * Math.cos(camYaw)) / d, -1, 1) * 0.8; }
 function buzz(ms) { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} }
 
 // ---------------- renderer ----------------
@@ -2880,7 +2943,7 @@ function botFire(b, t) {
   if (online) netShot(b, wi);
   alertBots(b.x, b.y, b, 60, b.z);
   const dm = Math.hypot(b.x - me.x, b.y - me.y);
-  shotSfx(wi, clamp(1 - dm / 180, 0, 1));
+  shotSfx(wi, clamp(1 - dm / 220, 0, 1), panOf(b.x, b.y));
   flash(b);
   if (hits && t.veh) { vehDamage(t.veh, W.dmg * hits * 0.5, b); if (Math.random() < 0.5) hits = 0; }
   if (hits) dealHit(b, t, W.dmg * hits * (t === me || t.kind === "remote" ? 0.75 : 1), wi, false);
@@ -3928,7 +3991,7 @@ function magOf(e, wi) {
   const slot = e.w ? e.w.indexOf(wi) : -1, ext = slot >= 0 && e.att && e.att[slot] && e.att[slot].x;
   return WEAP[wi].mag + (e === me && wi !== 3 && wi !== 4 && wi < 5 ? Math.floor((gunLevel(wi) - 1) * WEAP[wi].mag * 0.1) : 0) + (ext ? Math.ceil(WEAP[wi].mag * 0.5) : 0);
 }
-function fpsActive() { const v = SETTINGS.view || "auto"; return v === "fps" || (v === "auto" && MAP && MAP.kind === "arena"); }
+function fpsActive() { return SETTINGS.view === "fps"; } // the soldier is always on screen unless you choose first person
 
 // ---------------- bots ----------------
 // pick a spot behind an obstacle that the enemy cannot see (outdoors)
@@ -4430,7 +4493,7 @@ function render(dt) {
   camera.position.set(camTarget.x + rx * shU - dx * want + (Math.random() - 0.5) * sk, Math.max(0.35, camTarget.y - dy * want) + (Math.random() - 0.5) * sk, camTarget.z + rz * shU - dz * want + (Math.random() - 0.5) * sk);
   camera.lookAt(camera.position.x + dx, camera.position.y + dy, camera.position.z + dz);
   // when a wall pushes the camera right up to your head, hide your own body instead of filling the screen with it
-  if (me.vis && ce === me && !fpsCam) { const tooClose = camera.position.distanceTo(_sv2.set(me.x, (me.z || 0) + 1.45, me.y)) < 0.85; if (tooClose) me.vis.holder.visible = false; }
+  if (me.vis && ce === me && !fpsCam) { const tooClose = camera.position.distanceTo(_sv2.set(me.x, (me.z || 0) + 1.45, me.y)) < 0.42; if (tooClose) me.vis.holder.visible = false; }
   if (fpsCam) {
     // first person: eyes on the head, small bob while walking
     const eh = !me.alive ? 0.35 : me.climb ? 1.5 : me.stance === "prone" ? 0.42 : me.stance === "crouch" ? 1.12 : 1.62;
@@ -4766,7 +4829,7 @@ function syncRemotes(peers) {
       const shooter = s[1] ? ents.find((e) => e.id === s[1]) : r; if (!shooter || !WEAP[s[2]]) continue;
       if (isHost && s[1]) continue;
       const from = muzzlePos(shooter, new THREE.Vector3()), to = from.clone().add(new THREE.Vector3(Math.cos(shooter.a) * 40, 0, Math.sin(shooter.a) * 40));
-      addTracer(from, to, s[2] === 4); flash(shooter); shotSfx(s[2], clamp(1 - Math.hypot(shooter.x - me.x, shooter.y - me.y) / 180, 0, 1));
+      addTracer(from, to, s[2] === 4); flash(shooter); shotSfx(s[2], clamp(1 - Math.hypot(shooter.x - me.x, shooter.y - me.y) / 220, 0, 1), panOf(shooter.x, shooter.y));
     }
     const lastE = seenEv[pe.peer] || 0;
     for (const ev of pr.ev || []) {
@@ -4830,9 +4893,9 @@ function frame(now) {
 }
 applyQuality();
 // tiny version tag in the corner, so it's easy to tell whether the newest update has loaded
-{ const vt = document.createElement("div"); vt.textContent = "v20"; vt.style.cssText = "position:fixed;left:6px;bottom:3px;font:10px sans-serif;color:#fff;opacity:.45;pointer-events:none;z-index:99"; document.body.append(vt); }
+{ const vt = document.createElement("div"); vt.textContent = "v21"; vt.style.cssText = "position:fixed;left:6px;bottom:3px;font:10px sans-serif;color:#fff;opacity:.45;pointer-events:none;z-index:99"; document.body.append(vt); }
 camera.position.set(0, 30, 0); camera.lookAt(10, 0, 10);
 requestAnimationFrame(frame);
 window.__dbg = { dmg: (t, d, k) => applyDamage(t, d, k || null, k ? "x" : "", 2, false), ts: () => TS, revive: (a, b) => startRevive(a, b), startDrop: (i) => startDrop(i), drops: () => drops, redz, setMarker: (p) => setMarker(p) };
-window.__scene = scene; window.__ents = () => ents;
+window.__scene = scene; window.__ents = () => ents; window.__gun = { renderGunshot, GUNSND };
 window.__game = { rc: (...a) => rayCyl(...a), V: THREE.Vector3, cast(o, d, r) { const res = castShot(new THREE.Vector3(o[0], o[1], o[2]), new THREE.Vector3(d[0], d[1], d[2]).normalize(), r, me); return { t: res.t, ent: res.ent && res.ent.name, veh: res.veh && res.veh.id }; }, fire() { me.fireT = 0; playerFire(); }, get info() { return { calls: renderer.info.render.calls, tris: renderer.info.render.triangles }; }, tp(x, y, z = 0) { me.ph = "ground"; me.x = x; me.y = y; me.z = z; me.onGround = true; me.peak = z; }, enter(v) { enterVehicle(me, v); }, exit() { exitVehicle(me); }, door: setDoor, vault: () => vaultTarget(me, camYaw), path: navPath, get cam() { return camera; }, set pitchT(v) { camPitchT = v; camPitch = v; }, set yawT(v) { camYawT = v; camYaw = v; }, get me() { return me; }, get ents() { return ents; }, get map() { return MAP; }, _kill(i) { kill(ents[i], "me", me.name, 2, false); }, get yaw() { return camYaw; }, set yaw(v) { camYaw = v; }, set pitch(v) { camPitch = v; } };
