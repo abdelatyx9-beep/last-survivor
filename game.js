@@ -986,7 +986,7 @@ let zoneWall = null, nextRing = null, planeMesh = null, cityGltf = null, cityLoa
 function addCity() {
   const put = () => { if (!MAP || !MAP.city || !world) return; const g = cityGltf.scene.clone(); g.position.set(MAP.city.ox, 0.03, MAP.city.oy); g.traverse((o) => { if (o.isMesh) { o.castShadow = !/Roads/i.test(o.name); o.receiveShadow = true; } }); world.add(g); };
   if (cityGltf) { put(); return; }
-  if (cityLoading) return; cityLoading = true;
+  if (cityLoading || !cityGltf) return; cityLoading = true;
   new GLTFLoader().load(window.CITY_URL || "models/city.glb", (g) => { cityGltf = g; cityLoading = false; put(); }, undefined, () => { cityLoading = false; });
 }
 function makePlane() {
@@ -1138,18 +1138,23 @@ function makeLootMesh(it) {
 // ---- stance, jump, footsteps ----
 const nearGround = (e) => e.onGround || (e.z || 0) - groundAt(e.x, e.y, (e.z || 0) + 0.3) < 0.25;
 function setStance(e, s) {
-  if (!e.alive || e.ph !== "ground" || !nearGround(e) || e.veh || e.climb || e.knocked) return;
+  if (!e.alive || e.ph !== "ground" || e.veh || e.climb || e.knocked) return;
+  if (!nearGround(e) && e.stance === "stand") return;
   e.stance = e.stance === s ? "stand" : s;
   if (e === me) { updateStanceUi(); tone(e.stance === "stand" ? 520 : 360, 0.05, "triangle", 0.03); }
 }
 function doJump(e) {
+  if (e.alive && e.ph === "ground" && !e.veh && e.stance !== "stand") { e.stance = "stand"; if (e === me) { updateStanceUi(); tone(520, 0.05, "triangle", 0.03); } return; }
   if (!e.alive || e.ph !== "ground" || !nearGround(e) || e.healT > 0 || e.veh || e.climb || e.knocked || e.vz > 0.5) return;
   const vt = vaultTarget(e, e === me ? (Math.hypot(e.vx, e.vy) > 0.2 ? Math.atan2(e.vy, e.vx) : camYaw) : e.a);
   if (vt) { startClimb(e, vt); return; }
   if (e.stance !== "stand") { e.stance = "stand"; if (e === me) updateStanceUi(); return; }
   e.vz = 4.8; e.onGround = false; e.peak = e.z; if (e === me) noise(0.04, 0.06, 900, 300);
 }
-function updateStanceUi() { $("crouchBtn").classList.toggle("on", me.stance === "crouch"); $("proneBtn").classList.toggle("on", me.stance === "prone"); }
+function updateStanceUi() {
+  $("crouchBtn").classList.toggle("on", me.stance === "crouch"); $("proneBtn").classList.toggle("on", me.stance === "prone");
+  $("crouchBtn").firstChild.textContent = me.stance === "crouch" ? "قيام" : "جلوس"; $("proneBtn").firstChild.textContent = me.stance === "prone" ? "قيام" : "انبطاح";
+}
 const stepEls = [];
 function footsteps(e, moved) {
   if (e.stance === "prone" || e.onGround === false || e.veh || moved <= 0) return;
@@ -1287,7 +1292,7 @@ function makeRig(root, holder) {
   // characters that already wear a helmet and vest in their textures get a different fit for our gear
   let baked = false, op = false; root.traverse((o) => { if (o.isMesh && /Soldier_head|Soldier_body|Ch15/.test(o.name + (o.parent ? o.parent.name : ""))) baked = true; if (o.isMesh && /^Op_/.test(o.name)) op = true; });
   // the operator already wears a plate carrier and a helmet with night vision: no extra vest or helmet on top
-  rig.kit = op ? { noVest: true, noHelm: true } : baked ? { noVest: true, helmR: 0.14, helmY: 0.092, helmZ: 0.005 } : {};
+  rig.kit = op ? { noVest: true, noHelm: true, gunFwd: 0.13 } : baked ? { noVest: true, helmR: 0.14, helmY: 0.092, helmZ: 0.005 } : {};
   for (const side of ["Left", "Right"]) {
     const h = B[side + "Hand"], hwq = h.getWorldQuaternion(new THREE.Quaternion()).invert();
     const fingersW = W(B[side + "HandMiddle1"] || h).sub(W(h)).normalize();
@@ -1539,18 +1544,20 @@ function holdWeapon(rig, st, F, U, R, rArm, lArm, gun, dt, pitch) {
   const ak = rig.ak * (1 - rig.sk), sk = rig.sk, rk = Math.max(0, 1 - ak - sk);
   const dir = new THREE.Vector3().addScaledVector(aimDir, ak + 1e-4).addScaledVector(readyDir, rk).addScaledVector(sprintDir, sk).normalize();
   // where the gun's origin (stock butt / back of a pistol) sits
-  const pocket = rArm.clone().addScaledVector(R, -rig.shoulderW * 0.2).addScaledVector(F, 0.07);
+  // bulky plate carriers push the gun (and so the arms) further out, so the arms stay outside the vest and visible
+  const kf = (rig.kit && rig.kit.gunFwd) || 0;
+  const pocket = rArm.clone().addScaledVector(R, -rig.shoulderW * 0.2 + kf * 0.35).addScaledVector(F, 0.07 + kf);
   const pos = new THREE.Vector3();
   if (pistol) {
     const chest = rArm.clone().lerp(lArm, 0.5);
     const out = chest.clone().addScaledVector(U, -0.03).addScaledVector(aimDir, rig.armLen * 0.86);
-    const low = chest.clone().addScaledVector(U, -0.3).addScaledVector(F, rig.armLen * 0.55).addScaledVector(R, 0.04);
+    const low = chest.clone().addScaledVector(U, -0.3).addScaledVector(F, rig.armLen * 0.55 + kf).addScaledVector(R, 0.04);
     pos.copy(low).lerp(out, ak);
     dir.copy(readyDir).lerp(aimDir, ak).normalize();
   } else {
     pos.copy(pocket).addScaledVector(U, -0.03).multiplyScalar(ak);
     pos.addScaledVector(pocket.clone().addScaledVector(U, -0.1).addScaledVector(R, 0.03), rk);
-    pos.addScaledVector(rArm.clone().addScaledVector(U, -0.42).addScaledVector(F, 0.16).addScaledVector(R, 0.02), sk);
+    pos.addScaledVector(rArm.clone().addScaledVector(U, -0.42).addScaledVector(F, 0.16 + kf).addScaledVector(R, 0.02), sk);
     if (rig.pk > 0.5) pos.copy(pocket).addScaledVector(U, -0.02);
   }
   // recoil kick and a little breathing sway
@@ -1586,7 +1593,7 @@ function holdWeapon(rig, st, F, U, R, rArm, lArm, gun, dt, pitch) {
   }
   const gR = new THREE.Vector3(1, 0, 0).applyQuaternion(rig.gunQ).negate(); // gun's right side
   const gF = dir, gU = gup;
-  palmTo(rig, "Right", grip, rArm.clone().addScaledVector(R, 0.5).addScaledVector(U, -0.7).addScaledVector(F, -0.25 * (1 - rig.pk)),
+  palmTo(rig, "Right", grip, rArm.clone().addScaledVector(R, 0.65).addScaledVector(U, -0.6).addScaledVector(F, -0.25 * (1 - rig.pk)),
     gF.clone().multiplyScalar(0.55).addScaledVector(gU, -0.8).addScaledVector(gR, -0.15), gF.clone().addScaledVector(gU, 0.5), 0.95, true);
   B.RightHand.updateWorldMatrix(true, false);
   rig.handToGun = (rig.handToGun || new THREE.Matrix4()).copy(B.RightHand.matrixWorld).invert().multiply(gun.matrixWorld);
@@ -1595,7 +1602,8 @@ function holdWeapon(rig, st, F, U, R, rArm, lArm, gun, dt, pitch) {
     palmTo(rig, "Left", lt, lArm.clone().addScaledVector(R, -0.4).addScaledVector(U, -0.8),
       gF.clone().multiplyScalar(0.4).addScaledVector(gU, -0.8).addScaledVector(gR, 0.4), gF.clone().addScaledVector(gU, 0.3), 0.85);
   } else {
-    const lp = lArm.clone().addScaledVector(R, -0.12).addScaledVector(U, -0.9).addScaledVector(F, 0.3);
+    // left elbow points down and out to the side (like a real support arm) so the arm reads clearly, even from behind
+    const lp = lArm.clone().addScaledVector(R, -0.5).addScaledVector(U, -0.75).addScaledVector(F, 0.05);
     if (rp >= 0 && rp < 0.95) palmTo(rig, "Left", fore, lp, gU.clone().multiplyScalar(-1).addScaledVector(gF, 0.3), gF.clone(), 0.6);
     else palmTo(rig, "Left", fore.addScaledVector(gU, -0.035), lp, gF.clone().multiplyScalar(0.55).addScaledVector(gR, 0.75).addScaledVector(gU, 0.15), gF.clone().addScaledVector(gU, 0.4), 0.8);
   }
@@ -2700,12 +2708,21 @@ function prepModel(g) {
 function suitOf(id) { const s = SUITS.find((x) => x.id === id && x.gltf); return s ? s.gltf : soldierGltf; }
 function suitPick(pr) { pr = pr || {}; return (pr.suitV | 0) >= 2 && SUITS.some((x) => x.id === pr.suit) ? pr.suit : "op"; } // everyone starts in the new operator once
 function mySuit() { return suitPick(PROFILE); }
+let suitsDoneRes, akmRes, cityRes;
+const suitsDone = new Promise((r) => (suitsDoneRes = r)), akmReady = new Promise((r) => (akmRes = r)), cityReady = new Promise((r) => (cityRes = r));
+// everything a match needs; never wait longer than 25 s (slow network: start anyway)
+let assetsOk = false;
+function allReady() {
+  if (assetsOk) return Promise.resolve();
+  const lb = $("loadingBar"); if (lb) lb.hidden = false;
+  return Promise.race([Promise.all([loadModel, suitsDone, akmReady, cityReady]), new Promise((r) => setTimeout(r, 25000))]).then(() => { assetsOk = true; if (lb) lb.hidden = true; });
+}
 const loadModel = new Promise((resolve, reject) => {
   // load the suit you wear first, the other one right after
   const want = suitPick(store.get("ls3.profile", {})), first = SUITS.find((x) => x.id === want) || SUITS[0], rest = SUITS.filter((x) => x !== first);
   new GLTFLoader().load(first.url, (g) => { first.gltf = prepModel(g); soldierGltf = g; resolve(g);
     // the other suits load one after another in the background
-    const next = () => { const s2 = rest.shift(); if (!s2) return; new GLTFLoader().load(s2.url, (g2) => { s2.gltf = prepModel(g2); next(); }, undefined, next); }; next();
+    const next = () => { const s2 = rest.shift(); if (!s2) { suitsDoneRes(); return; } new GLTFLoader().load(s2.url, (g2) => { s2.gltf = prepModel(g2); next(); }, undefined, next); }; next();
   }, (ev) => {
     if (ev.total) $("loadPct").textContent = ar(Math.round(ev.loaded / ev.total * 100)) + "٪";
   }, reject);
@@ -2717,7 +2734,9 @@ new GLTFLoader().load(window.AKM_URL || "models/akm.glb", (g) => {
   g.scene.traverse((o) => { if (o.isMesh) { o.material.envMapIntensity = 1.2; meshes.push([o.geometry, o.material]); } });
   setHiGun("rifle", meshes, { grip: new THREE.Vector3(0, -0.02, 0.271), fore: new THREE.Vector3(0, 0.04, 0.6), mag: new THREE.Vector3(0, -0.05, 0.4), kick: 0.05, muzzle: new THREE.Vector3(0, 0.075, 0.872), rail: new THREE.Vector3(0, 0.12, 0.36) });
   if (lobby.model) setTimeout(setupLobbyModel, 0);
-}, undefined, () => {});
+  akmRes();
+}, undefined, () => akmRes());
+new GLTFLoader().load(window.CITY_URL || "models/city.glb", (g) => { cityGltf = g; cityRes(); }, undefined, () => cityRes());
 function loadFailed() {
   const l = $("loading"); l.textContent = "ما قدرنا نحمّل الجندي. تأكد من النت واضغط «حاول مرة ثانية». ";
   const b = document.createElement("button"); b.className = "btn"; b.type = "button"; b.textContent = "حاول مرة ثانية"; b.style.marginTop = "8px";
@@ -2825,6 +2844,7 @@ function startMatch(seed, opts) {
   matchStartWall = opts.t0; matchT = 0; mode = "play";
   tutorial = { step: arena || store.get("ls3.tut", 0) >= 3 ? 99 : 0, t: 0 };
   showHud(true); updateHud(true); keepAwake();
+  setTimeout(() => { try { for (const e of ents) if (e.vis) e.vis.holder.visible = true; if (planeMesh) planeMesh.visible = true; renderer.compile(scene, camera); } catch (err) {} }, 50);
   if (arena) hint("اقتل الفريق الأحمر! أول فريق يوصل " + ar(ARENA.target) + " قتلة يفوز", 4500);
   else hint(IS_TOUCH ? "اضغط زر «اقفز» لما تكون فوق مكان يعجبك" : "اضغط مسافة (Space) عشان تقفز من الطيارة");
 }
@@ -3721,7 +3741,7 @@ document.querySelectorAll(".modes button").forEach((b) => b.addEventListener("cl
 }));
 $("startBtn").addEventListener("click", async () => {
   audio();
-  if (playMode === "arena") { goFullscreen(); store.set("ls3.nick", $("nick").value.trim()); await loadModel; online = false; isHost = false; show(null); startMatch((Math.random() * 1e9) >>> 0, { kind: "arena", bots: ARENA.team * 2 - 1, t0: Date.now() + 3000 }); return; }
+  if (playMode === "arena") { goFullscreen(); store.set("ls3.nick", $("nick").value.trim()); await loadModel; await allReady(); online = false; isHost = false; show(null); startMatch((Math.random() * 1e9) >>> 0, { kind: "arena", bots: ARENA.team * 2 - 1, t0: Date.now() + 3000 }); return; }
   (playMode === "online" ? $("onlineBtn") : $("soloBtn")).click();
 });
 canvas.addEventListener("pointerdown", (e) => { if (mode === "play") return; lobby.drag = { x: e.clientX }; });
@@ -4765,7 +4785,7 @@ async function goFullscreen() {
 // installed app: turn sideways straight away, no tap needed
 if (IS_TOUCH && matchMedia("(display-mode: fullscreen), (display-mode: standalone)").matches) { try { screen.orientation?.lock?.("landscape").catch(() => {}); } catch (e) {} }
 $("soloBtn").addEventListener("click", async () => {
-  goFullscreen(); audio(); store.set("ls3.nick", $("nick").value.trim()); await loadModel;
+  goFullscreen(); audio(); store.set("ls3.nick", $("nick").value.trim()); await loadModel; await allReady();
   online = false; isHost = false; show(null); startMatch((Math.random() * 1e9) >>> 0, { bots: 49, t0: Date.now() + 3000, ts: prefTs() });
 });
 $("toMenuBtn").addEventListener("click", () => { if (online) leaveRoom(); toMenu(); });
@@ -4797,7 +4817,7 @@ let netSeq = 0, evOut = [], shotsOut = [], tookOut = [], botDeaths = [], seenEv 
 $("onlineBtn").addEventListener("click", async () => {
   goFullscreen(); audio(); store.set("ls3.nick", $("nick").value.trim());
   if (!roomApi) { $("onlineNote").textContent = "الأونلاين يحتاج إنترنت وتسجيل دخول."; return; }
-  await loadModel; mode = "lobby"; show("lobby"); $("lobbyJoin").hidden = false; $("lobbyRoom").hidden = true; $("lobbyBack").hidden = false;
+  await loadModel; await allReady(); mode = "lobby"; show("lobby"); $("lobbyJoin").hidden = false; $("lobbyRoom").hidden = true; $("lobbyBack").hidden = false;
 });
 $("lobbyBack").addEventListener("click", () => { leaveRoom(); toMenu(); });
 $("createBtn").addEventListener("click", () => enterRoom(Array.from({ length: 4 }, () => "ABCDEFGHJKMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 31)]).join("")));
@@ -4952,7 +4972,7 @@ function frame(now) {
 }
 applyQuality();
 // tiny version tag in the corner, so it's easy to tell whether the newest update has loaded
-{ const vt = document.createElement("div"); vt.textContent = "v25"; vt.style.cssText = "position:fixed;left:6px;bottom:3px;font:10px sans-serif;color:#fff;opacity:.45;pointer-events:none;z-index:99"; document.body.append(vt); }
+{ const vt = document.createElement("div"); vt.textContent = "v26"; vt.style.cssText = "position:fixed;left:6px;bottom:3px;font:10px sans-serif;color:#fff;opacity:.45;pointer-events:none;z-index:99"; document.body.append(vt); }
 camera.position.set(0, 30, 0); camera.lookAt(10, 0, 10);
 requestAnimationFrame(frame);
 window.__dbg = { dmg: (t, d, k) => applyDamage(t, d, k || null, k ? "x" : "", 2, false), ts: () => TS, revive: (a, b) => startRevive(a, b), startDrop: (i) => startDrop(i), drops: () => drops, redz, setMarker: (p) => setMarker(p) };

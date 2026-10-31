@@ -127,8 +127,12 @@ h3.sub { margin: 4px 0 0; font-size: 13px; opacity: .8; font-weight: 600; }
 .bag-row button[data-use] { border-color: var(--medic); color: var(--medic); }
 .pickup { pointer-events: auto; background: var(--signal); color: var(--ink); border: 0; border-radius: 5px; padding: 9px 16px; font-family: var(--font-display); font-weight: 700; font-size: 15px; cursor: pointer; }
 .jump { pointer-events: auto; position: absolute; bottom: calc(30px + env(safe-area-inset-bottom, 0px)); right: max(30px, env(safe-area-inset-right, 0px)); background: var(--signal); color: var(--ink); border: 0; border-radius: 50%; width: 96px; height: 96px; font-family: var(--font-display); font-weight: 800; font-size: 24px; cursor: pointer; box-shadow: 0 0 0 6px rgba(242,165,65,.3), 0 8px 30px rgba(0,0,0,.4); }
-.right { position: absolute; right: max(18px, env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); display: grid; grid-template-columns: auto auto; gap: 10px; align-items: end; pointer-events: auto; }
-.left-acts { position: absolute; left: max(14px, env(safe-area-inset-left, 0px)); top: 42%; display: grid; gap: 8px; pointer-events: auto; }
+.right { position: absolute; right: calc(max(10px, env(safe-area-inset-right, 0px)) + 66px); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); display: grid; grid-template-columns: auto auto; gap: 10px; align-items: end; pointer-events: auto; }
+/* heal + throw sit right next to the weapon slots; the bag goes under the minimap (like PUBG) */
+.left-acts { position: absolute; left: calc(50% + min(180px, 23vw) + 10px); bottom: calc(26px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 8px; pointer-events: auto; }
+.left-acts .act { width: 46px; height: 46px; }
+#bagBtn { position: fixed; left: max(14px, env(safe-area-inset-left, 0px)); top: 132px; }
+@media (max-height: 430px) { #bagBtn { top: 108px; } }
 .act { width: 52px; height: 52px; border-radius: 50%; border: 1.5px solid rgba(232,220,181,.5); background: rgba(18,22,14,.6); color: var(--khaki); font-family: var(--font-body); font-size: 10.5px; line-height: 1.15; display: grid; place-items: center; cursor: pointer; padding: 0; }
 .act b { display: block; font-family: var(--font-display); font-size: 14px; color: var(--signal); }
 .act.on { border-color: var(--signal); background: rgba(242,165,65,.3); }
@@ -136,10 +140,13 @@ h3.sub { margin: 4px 0 0; font-size: 13px; opacity: .8; font-weight: 600; }
 .stick { position: absolute; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; border: 2px solid rgba(232,220,181,.35); background: rgba(18,22,14,.2); pointer-events: none; }
 .stick i { position: absolute; left: 35px; top: 35px; width: 50px; height: 50px; border-radius: 50%; background: rgba(232,220,181,.45); }
 body.desktop .fire, body.desktop #aimBtn, body.desktop .stance { display: none; }
-.stance { position: absolute; right: max(18px, env(safe-area-inset-right, 0px)); bottom: calc(150px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 8px; pointer-events: auto; }
-.lean { position: absolute; left: calc(max(14px, env(safe-area-inset-left, 0px)) + 62px); top: 42%; display: flex; gap: 10px; pointer-events: auto; direction: ltr; }
+/* jump / crouch / prone in a column on the far right edge, fire button just left of them */
+.stance { position: absolute; right: max(10px, env(safe-area-inset-right, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 8px; pointer-events: auto; }
+.stance #proneBtn { order: 3; } .stance #crouchBtn { order: 2; } .stance #hopBtn { order: 1; }
+.lean { position: absolute; left: calc(max(14px, env(safe-area-inset-left, 0px)) + 70px); top: 128px; display: flex; gap: 10px; pointer-events: auto; direction: ltr; }
+@media (max-height: 430px) { .lean { top: 104px; } }
 .lean .act { font-size: 18px; }
-@media (max-height: 430px) { .stance { bottom: calc(138px + env(safe-area-inset-bottom, 0px)); } .stance .act { width: 46px; height: 46px; } }
+@media (max-height: 430px) { .stance { gap: 6px; } .stance .act { width: 46px; height: 46px; } }
 .gear { pointer-events: auto; background: rgba(18,22,14,.72); border: 1px solid rgba(232,220,181,.3); color: var(--khaki); border-radius: 4px; width: 34px; height: 30px; font-size: 16px; cursor: pointer; padding: 0; }
 .fsteps { position: absolute; top: 50%; left: 50%; width: 0; height: 0; pointer-events: none; }
 .step { position: absolute; width: 14px; height: 22px; border-radius: 50% 50% 45% 45%; background: rgba(255,255,255,.85); box-shadow: 0 0 6px rgba(0,0,0,.6); transition: opacity .6s; }
@@ -445,6 +452,7 @@ body.arena .alivechip, body.arena .zone-msg, body.arena .left-acts, body.arena #
       <p class="loading" id="loading">جاري تحميل الجندي… <b id="loadPct"></b></p>
       <div id="menuBtns" hidden>
         <button class="startbtn" id="startBtn" type="button">ابدأ</button>
+        <p class="note" id="loadingBar" hidden style="text-align:center;color:#f2a541">لحظة… نجهّز الجنود والخريطة</p>
         <button id="soloBtn" type="button" hidden></button><button id="onlineBtn" type="button" hidden></button>
       </div>
       <p class="note" id="onlineNote">البلدة القديمة – أول فريق يوصل ٣٠ قتلة يفوز</p>
