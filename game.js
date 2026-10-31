@@ -4952,7 +4952,7 @@ function frame(now) {
 }
 applyQuality();
 // tiny version tag in the corner, so it's easy to tell whether the newest update has loaded
-{ const vt = document.createElement("div"); vt.textContent = "v24"; vt.style.cssText = "position:fixed;left:6px;bottom:3px;font:10px sans-serif;color:#fff;opacity:.45;pointer-events:none;z-index:99"; document.body.append(vt); }
+{ const vt = document.createElement("div"); vt.textContent = "v25"; vt.style.cssText = "position:fixed;left:6px;bottom:3px;font:10px sans-serif;color:#fff;opacity:.45;pointer-events:none;z-index:99"; document.body.append(vt); }
 camera.position.set(0, 30, 0); camera.lookAt(10, 0, 10);
 requestAnimationFrame(frame);
 window.__dbg = { dmg: (t, d, k) => applyDamage(t, d, k || null, k ? "x" : "", 2, false), ts: () => TS, revive: (a, b) => startRevive(a, b), startDrop: (i) => startDrop(i), drops: () => drops, redz, setMarker: (p) => setMarker(p) };
