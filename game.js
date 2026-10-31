@@ -1348,8 +1348,9 @@ function rigUpdate(rig, st, dt, gun) {
   const ground = st.ph === "ground" && !st.veh;
   rig.ck = k(rig.ck, ground && st.stance === "crouch" ? 1 : 0, 9);
   rig.pk = k(rig.pk, ground && st.stance === "prone" ? 1 : 0, 6);
-  rig.sk = k(rig.sk, ground && st.sprint && !st.aiming && st.stance === "stand" ? 1 : 0, 8);
-  rig.ak = k(rig.ak, st.aiming || st.now - st.firedAt < 1.2 ? 1 : 0, st.aiming ? 14 : 6);
+  // gun carries change slowly enough that you never see the gun flicker between poses
+  rig.sk = k(rig.sk, ground && st.sprint && !st.aiming && st.stance === "stand" ? 1 : 0, 4.5);
+  rig.ak = k(rig.ak, st.aiming || st.now - st.firedAt < 1.2 ? 1 : 0, st.aiming ? 14 : 4);
   rig.lean = k(rig.lean, ground && st.stance !== "prone" ? st.lean : 0, 10);
   rig.ffk = k(rig.ffk, st.ph === "air" && st.freefall ? 1 : 0, 3);
   rig.pak = k(rig.pak, st.ph === "para" ? 1 : 0, 4);
@@ -4298,9 +4299,9 @@ function update(dt) {
       const k = 1 - Math.exp(-dt * 10); // ease in/out so movement has a bit of weight
       me.vx = lerp(me.vx, vx, k); me.vy = lerp(me.vy, vy, k); me.inX = vx; me.inY = vy;
       if (me.ph === "ground") {
-        const combatFace = input.firing() || aimZoom || me.shotT > 1.3 || fpsActive() || me.veh || me.stance === "prone";
-        if (combatFace) me.a = camYaw;
-        else if (l > 0.1) { const ta = Math.atan2(vy, vx); let da = ta - me.a; da = Math.atan2(Math.sin(da), Math.cos(da)); me.a += da * Math.min(1, dt * 10); }
+        const combatFace = input.firing() || aimZoom || me.shotT > 0.4 || fpsActive() || me.veh || me.stance === "prone";
+        const ta = combatFace ? camYaw : l > 0.1 ? Math.atan2(vy, vx) : null;
+        if (ta !== null) { let da = ta - me.a; da = Math.atan2(Math.sin(da), Math.cos(da)); me.a += da * Math.min(1, dt * (aimZoom || fpsActive() ? 30 : combatFace ? 14 : 9)); }
       }
       else if (me.ph === "para") me.a = camYaw;
       { const f = input.firing(), single = me.fm[me.cur] === "single"; if (f && (!single || !me.trigWas)) playerFire(); me.trigWas = f; }
@@ -4465,10 +4466,11 @@ function render(dt) {
     const st = e.ph === "ground" ? e.stance : "stand", spd = Math.hypot(v.vx, v.vy);
     if (e.alive) {
       const combat = (e === me && aimZoom) || e.shotT > 0.6 || (e.kind === "bot" && !!e.seen) || e.reloadT > 0;
+      e.runOn = e.runOn ? spd > 2.6 : spd > 3.4;
       const kneelReload = st === "crouch" && e.reloadT > 0 && !e.moving && !!v.acts.kneel;
       const pick = e.climb ? "sprint" : e.ph !== "ground" || e.onGround === false || e.veh || e.knocked ? "idle" : kneelReload ? "kneel"
         // real (motion-captured) upright walk and run; the bent tactical walk only when crouched
-        : e.moving ? (st !== "stand" ? "walk" : e.healT > 0 || (e === me && aimZoom) || spd < 3 ? "walkup" : "sprint") : "idle";
+        : e.moving ? (st !== "stand" ? "walk" : e.healT > 0 || (e === me && aimZoom) || !e.runOn ? "walkup" : "sprint") : "idle";
       setAnim(v, pick);
       // play the legs at the speed the body really moves
       const nominal = { walk: 2.4, run: 4.6, sprint: 5.2, walkup: 1.7, strafe: 2.2 }[v.cur];
@@ -4501,7 +4503,7 @@ function render(dt) {
         const look = e === me ? null : e.target && e.target.alive && e.seen ? e.target : null;
         rigUpdate(v.rig, {
           yawRate: v.yawRate, speed: spd, mocapReload: v.cur === "kneel", lookAt: look ? [look.x, (look.z || 0) + 1.5, look.y] : null, ground: (x, y) => groundAt(x, y, (e.z || 0) + 0.7), baseZ: e.z || 0,
-          ph: e.ph === "para" ? (e.z >= 32 ? "air" : "para") : e.ph, freefall: e.ph === "para" && e.z >= 32, stance: st, moving: e.moving && spd > 0.4, sprint: e.moving && spd > 4.2 && !(e.shotT > 0.6),
+          ph: e.ph === "para" ? (e.z >= 32 ? "air" : "para") : e.ph, freefall: e.ph === "para" && e.z >= 32, stance: st, moving: e.moving && spd > 0.4, sprint: e.moving && !!e.runOn && !(e.shotT > 0.6) && !(e === me && aimZoom),
           moveAng: -ma, aimPitch: e === me ? (aimZoom || me.shotT > 1.0 || !me.moving ? camPitch : 0.08) : e.aimP || 0, aiming: (e === me && aimZoom) || (e.kind === "bot" && !!e.seen), firedAt: e.shotT > 0 ? now - (2 - e.shotT) : -9, hitAt: e.hitAt || 0,
           reloadP: e.reloadT > 0 && wi >= 0 ? clamp(1 - e.reloadT / (WEAP[wi].reload * (e === me ? relK(me, wi) : 1)), 0, 1) : -1, wclass: wcls, lean: e.lean || 0,
           alive: e.alive, deadT: e.deadT || 0, deadDir: e.deadDir || 1, veh: !!e.veh, driver: !!(e.veh && e.veh.driver === e), airborne: e.onGround === false, now
@@ -4972,7 +4974,7 @@ function frame(now) {
 }
 applyQuality();
 // tiny version tag in the corner, so it's easy to tell whether the newest update has loaded
-{ const vt = document.createElement("div"); vt.textContent = "v26"; vt.style.cssText = "position:fixed;left:6px;bottom:3px;font:10px sans-serif;color:#fff;opacity:.45;pointer-events:none;z-index:99"; document.body.append(vt); }
+{ const vt = document.createElement("div"); vt.textContent = "v27"; vt.style.cssText = "position:fixed;left:6px;bottom:3px;font:10px sans-serif;color:#fff;opacity:.45;pointer-events:none;z-index:99"; document.body.append(vt); }
 camera.position.set(0, 30, 0); camera.lookAt(10, 0, 10);
 requestAnimationFrame(frame);
 window.__dbg = { dmg: (t, d, k) => applyDamage(t, d, k || null, k ? "x" : "", 2, false), ts: () => TS, revive: (a, b) => startRevive(a, b), startDrop: (i) => startDrop(i), drops: () => drops, redz, setMarker: (p) => setMarker(p) };
